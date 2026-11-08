@@ -23,6 +23,11 @@ PILOT_PARAMS = {
     "p": 2,              # Early Stopping: cierpliwość (checkpointy bez poprawy)
 }
 
+# Referencje: Bagging drzew decyzyjnych i Random Forest (parametry domyślne sklearn)
+REF_PARAMS = {
+    "n_estimators": 100,
+}
+
 PILOT_DATASETS = {
     "clf": ["wine", "breast_cancer", "banknote"],
     "reg": ["yacht", "auto_mpg", "concrete"],

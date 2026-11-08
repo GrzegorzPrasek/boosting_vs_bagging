@@ -56,6 +56,8 @@ class BaggedGBDT(BaseEstimator):
             X_val: np.ndarray | None = None, y_val: np.ndarray | None = None):
         if self.task not in ("clf", "reg"):
             raise ValueError(f"task must be 'clf' or 'reg', got {self.task!r}")
+        if self.adaptive_sampling or self.ensemble_es:
+            raise NotImplementedError("Modyfikacje 1 i 2 – etapy 5 i 6")
         if self.ensemble_es and (X_val is None or y_val is None):
             raise ValueError("ensemble_es=True wymaga X_val i y_val")
 

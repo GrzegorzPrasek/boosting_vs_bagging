@@ -41,11 +41,13 @@ Termin: wtorek 10.11. Do dyspozycji: reszta niedzieli 8.11 + poniedziałek 9.11.
 **Gotowe gdy:** baseline daje sensowny wynik na Wine i Yacht.
 
 ## Etap 4 – Pipeline CV i metryki (poniedziałek rano)
-- [ ] 2×5-fold, ziarna 42 i 2026; `StratifiedKFold` dla clf, `KFold` dla reg
-- [ ] W każdym foldzie: 20% train → walidacja wewnętrzna (stratyfikowana dla clf), ten sam podział dla wszystkich metod
-- [ ] Metryki: Macro F1 + Accuracy / MAE + RMSE; czas treningu, czas predykcji, liczba drzew
-- [ ] Referencje: `GradientBoosting*`, `Bagging*` (drzewa), `RandomForest*`
-- [ ] Zapis wiersza (zbiór, metoda, seed, fold, metryki) do `results/pilot.csv`
+- [x] 2×5-fold, ziarna 42 i 2026; `StratifiedKFold` dla clf, `KFold` dla reg
+- [x] W każdym foldzie: 20% train → walidacja wewnętrzna (stratyfikowana dla clf), ten sam podział dla wszystkich metod
+- [x] Metryki: Macro F1 + Accuracy / MAE + RMSE; czas treningu, czas predykcji, liczba drzew
+- [x] Referencje: `GradientBoosting*`, `Bagging*` (drzewa), `RandomForest*`
+- [x] Zapis wiersza (zbiór, metoda, seed, fold, metryki) do `results/pilot.csv`
+
+- Wszystkie metody trenują na tej samej części treningowej (80%); walidację wewnętrzną widzi tylko ES.
 
 **Gotowe gdy:** pipeline działa end-to-end dla baseline + 3 referencji na 1 zbiorze.
 
