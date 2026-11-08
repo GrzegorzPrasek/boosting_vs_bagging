@@ -32,11 +32,11 @@ Termin: wtorek 10.11. Do dyspozycji: reszta niedzieli 8.11 + poniedziałek 9.11.
 **Gotowe gdy:** wszystkie 6 zbiorów się ładuje. NaN w cechach liczbowych (Auto MPG: 6) uzupełnia `impute_median` w obrębie foldu (bez wycieku). Yacht pobierany bezpośrednio z UCI (brak w `ucimlrepo`).
 
 ## Etap 3 – Baseline: Bagging + GBDT (niedziela)
-- [ ] Klasa `BaggedGBDT(task, B, M, max_depth, lr, adaptive_sampling=False, ensemble_es=False, alpha, beta, k, p, random_state)`
-- [ ] `fit(X_train, y_train, X_val, y_val)`, `predict`, `predict_proba`; atrybuty `n_trees_total_`, `fit_time_`
-- [ ] Bootstrap 100% ze zwracaniem, zapamiętanie indeksów (do OOB)
-- [ ] Agregacja: średnia predykcji (reg) / średnia `predict_proba` (clf)
-- [ ] `predict_proba` z wszystkimi klasami, nawet gdy jakiejś brak w próbce bootstrapowej
+- [x] Klasa `BaggedGBDT(task, B, M, max_depth, lr, adaptive_sampling=False, ensemble_es=False, alpha, beta, k, p, random_state)`
+- [x] `fit(X_train, y_train, X_val, y_val)`, `predict`, `predict_proba`; atrybuty `n_trees_total_`, `fit_time_`
+- [x] Bootstrap 100% ze zwracaniem, zapamiętanie indeksów (do OOB)
+- [x] Agregacja: średnia predykcji (reg) / średnia `predict_proba` (clf)
+- [x] `predict_proba` z wszystkimi klasami, nawet gdy jakiejś brak w próbce bootstrapowej
 
 **Gotowe gdy:** baseline daje sensowny wynik na Wine i Yacht.
 
