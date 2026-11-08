@@ -65,11 +65,14 @@ Termin: wtorek 10.11. Do dyspozycji: reszta niedzieli 8.11 + poniedziałek 9.11.
 **Gotowe gdy:** wariant +1 działa, rozkład P(i) nie jest zdegenerowany (sprawdzić min/max).
 
 ## Etap 6 – Modyfikacja 2: Ensemble-Aware Early Stopping (poniedziałek)
-- [ ] GBDT z `warm_start=True`, dokładanie po k drzew aż do M
-- [ ] Na każdym checkpoincie ocena zespołu (gotowe modele + aktualny) na walidacji wewnętrznej (F1 / MAE)
-- [ ] Przy poprawie `deepcopy` modelu jako najlepszy; stop po p checkpointach bez poprawy
-- [ ] Do zespołu trafia najlepsza kopia; zapis liczby drzew każdego modelu
-- [ ] Wariant +1+2: oba mechanizmy naraz
+- [x] GBDT z `warm_start=True`, dokładanie po k drzew aż do M
+- [x] Na każdym checkpoincie ocena zespołu (gotowe modele + aktualny) na walidacji wewnętrznej (F1 / MAE)
+- [x] Przy poprawie `deepcopy` modelu jako najlepszy; stop po p checkpointach bez poprawy
+- [x] Do zespołu trafia najlepsza kopia; zapis liczby drzew każdego modelu
+- [x] Wariant +1+2: oba mechanizmy naraz
+
+- Kryterium ES: log-loss (clf) / MAE (reg) zespołu na walidacji; poprawa = spadek o > 0.1% (`es_tol`)
+- Zapis: `n_trees` (w zespole) i `n_trees_trained` (zbudowane, koszt), historia checkpointów w `es_history_`
 
 **Gotowe gdy:** wariant +2 kończy z mniej niż B·M drzewami na części zbiorów.
 

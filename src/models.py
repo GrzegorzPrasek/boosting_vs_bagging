@@ -7,6 +7,7 @@ Etap 6: Ensemble-Aware ES   -> `_fit_one`.
 
 from __future__ import annotations
 
+import copy
 import time
 
 import numpy as np
@@ -26,7 +27,10 @@ class BaggedGBDT(BaseEstimator):
       inbag_            macierz bool (B, n): czy obserwacja trafiła do próbki modelu b
       classes_          etykiety klas (clf)
       n_stages_         liczba iteracji boostingu każdego modelu
-      n_trees_total_    łączna liczba drzew (w klasyfikacji wieloklasowej K drzew na iterację)
+      n_trees_total_    łączna liczba drzew w zespole (w clf wieloklasowej K drzew na iterację)
+      n_trees_trained_  łączna liczba zbudowanych drzew (z ES: także te za najlepszym checkpointem)
+      sampling_stats_   diagnostyka rozkładu P(i) (Adaptive Sampling)
+      es_history_       lista (liczba iteracji, strata walidacyjna zespołu) na model (ES)
       fit_time_         czas treningu w sekundach (z narzutem modyfikacji)
     """
 
@@ -34,7 +38,7 @@ class BaggedGBDT(BaseEstimator):
                  max_depth: int = 3, learning_rate: float = 0.1,
                  adaptive_sampling: bool = False, alpha: float = 1.0, beta: float = 1.0,
                  ensemble_es: bool = False, k: int = 20, p: int = 2,
-                 random_state: int | None = None):
+                 es_metric: str = "auto", es_tol: float = 1e-3, random_state: int | None = None):
         self.task = task
         self.B = B
         self.M = M
@@ -46,6 +50,8 @@ class BaggedGBDT(BaseEstimator):
         self.ensemble_es = ensemble_es
         self.k = k
         self.p = p
+        self.es_metric = es_metric
+        self.es_tol = es_tol
         self.random_state = random_state
 
     # ------------------------------------------------------------------ #
@@ -56,8 +62,6 @@ class BaggedGBDT(BaseEstimator):
             X_val: np.ndarray | None = None, y_val: np.ndarray | None = None):
         if self.task not in ("clf", "reg"):
             raise ValueError(f"task must be 'clf' or 'reg', got {self.task!r}")
-        if self.ensemble_es:
-            raise NotImplementedError("Modyfikacja 2 – etap 6")
         if self.ensemble_es and (X_val is None or y_val is None):
             raise ValueError("ensemble_es=True wymaga X_val i y_val")
 
@@ -70,7 +74,10 @@ class BaggedGBDT(BaseEstimator):
         self.estimators_ = []
         self.inbag_ = np.zeros((self.B, n), dtype=bool)
         self.sampling_stats_ = []
+        self.es_history_ = []
         self._train_outputs = []  # predykcje modeli na X (do OOB w Adaptive Sampling)
+        self._val_sum = None      # suma predykcji gotowych modeli na X_val (do ES)
+        self._n_trained = 0
 
         for b in range(self.B):
             idx = self._sample_indices(b, X, y, rng)
@@ -80,7 +87,11 @@ class BaggedGBDT(BaseEstimator):
             self.estimators_.append(model)
             if self.adaptive_sampling and b < self.B - 1:
                 self._train_outputs.append(self._model_output(model, X))
-        del self._train_outputs
+            if self.ensemble_es:
+                out = self._model_output(model, X_val)
+                self._val_sum = out if self._val_sum is None else self._val_sum + out
+        self.n_trees_trained_ = self._n_trained
+        del self._train_outputs, self._val_sum, self._n_trained
 
         self.n_stages_ = np.array([m.n_estimators_ for m in self.estimators_])
         self.n_trees_total_ = int(sum(m.estimators_.size for m in self.estimators_))
@@ -151,9 +162,65 @@ class BaggedGBDT(BaseEstimator):
     def _fit_one(self, X: np.ndarray, y: np.ndarray,
                  X_val: np.ndarray | None, y_val: np.ndarray | None,
                  seed: int):
-        """Trening jednego GBDT. Baseline: stałe M drzew."""
-        model = self._new_gbdt(seed)  # Etap 6: Ensemble-Aware ES
-        return model.fit(X, y)
+        """Trening jednego GBDT.
+
+        Baseline: stałe M drzew.
+        Ensemble-Aware ES: co k iteracji checkpoint – strata walidacyjna całego zespołu
+        (gotowe modele + bieżący). Poprawa = spadek straty o więcej niż es_tol
+        (względnie, np. 1e-3 = 0.1%). Przy poprawie zapamiętujemy kopię modelu; po p
+        checkpointach bez poprawy (lub po M iteracjach) zwracamy najlepszą kopię.
+        """
+        if not self.ensemble_es:
+            model = self._new_gbdt(seed).fit(X, y)
+            self._n_trained += model.estimators_.size
+            return model
+
+        n_done = len(self.estimators_)
+        model = self._new_gbdt(seed, n_estimators=self.k, warm_start=True)
+        best_loss, best_model, no_improve, history = np.inf, None, 0, []
+        while True:
+            model.fit(X, y)
+            out = self._model_output(model, X_val)
+            ens = out if self._val_sum is None else (self._val_sum + out) / (n_done + 1)
+            loss = self._es_loss(y_val, ens)
+            history.append((model.n_estimators_, loss))
+            if loss < best_loss * (1.0 - self.es_tol) or best_model is None:
+                best_loss, best_model, no_improve = loss, copy.deepcopy(model), 0
+            else:
+                no_improve += 1
+            if no_improve >= self.p or model.n_estimators_ >= self.M:
+                break
+            model.n_estimators = min(model.n_estimators_ + self.k, self.M)
+
+        self._n_trained += model.estimators_.size
+        self.es_history_.append(history)
+        best_model.warm_start = False
+        return best_model
+
+    def _es_loss(self, y_val: np.ndarray, ens: np.ndarray) -> float:
+        """Strata walidacyjna zespołu (mniejsza = lepsza).
+
+        es_metric="auto": log-loss (clf) / MAE (reg). Log-loss zamiast Macro F1, bo F1
+        na małej walidacji jest skokowe i często stoi w miejscu -> zbyt wczesny stop.
+        Dostępne też: "f1" (clf), "mae", "mse" (reg).
+        """
+        metric = self.es_metric
+        if metric == "auto":
+            metric = "logloss" if self.task == "clf" else "mae"
+        if self.task == "clf":
+            cols = np.searchsorted(self.classes_, y_val)
+            if metric == "logloss":
+                p_true = np.clip(ens[np.arange(len(y_val)), cols], 1e-15, 1.0)
+                return float(-np.mean(np.log(p_true)))
+            if metric == "f1":
+                from sklearn.metrics import f1_score
+                return -f1_score(y_val, self.classes_[ens.argmax(1)], average="macro")
+        else:
+            if metric == "mae":
+                return float(np.mean(np.abs(y_val - ens)))
+            if metric == "mse":
+                return float(np.mean((y_val - ens) ** 2))
+        raise ValueError(f"Nieobsługiwana es_metric={self.es_metric!r} dla task={self.task!r}")
 
     # ------------------------------------------------------------------ #
     # Pomocnicze
