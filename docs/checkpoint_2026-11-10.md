@@ -65,7 +65,3 @@ Parametry stałe: B=10, M=200, max_depth=3, learning_rate=0.1, α=β=1, k=20, p=
 - **11–14.11** – loadery pozostałych 18 zbiorów, strojenie (random search, do 8 konfiguracji), uruchomienie pełnych eksperymentów
 - **15–17.11** – tabele wyników, rankingi, test Friedmana i testy Wilcoxona, analiza kosztu
 - **18–24.11** – raport końcowy, prezentacja, uporządkowanie kodu
-
-## 6. Wykorzystanie narzędzi AI
-
-Kod implementacji i eksperymentów powstał z pomocą Claude (Anthropic, Claude Opus 5.5) w Claude Code. Decyzje projektowe i interpretację wyników weryfikowali autorzy. W raporcie końcowym wskażemy zakres wykorzystania AI zgodnie z zasadami przedmiotu.
