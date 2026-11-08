@@ -6,7 +6,7 @@
 
 | Etap z harmonogramu | Stan |
 |---|---|
-| Implementacja algorytmu bazowego, modyfikacji 1 i 2 | zrobione |
+| Implementacja algorytmu bazowego, modyfikacji 1 i 2 | zrobione, z testami poprawności (pytest) |
 | Przygotowanie danych | zrobione dla 6 zbiorów pilotażowych; pozostałe 18 do 14.11 |
 | Wstępne eksperymenty (pilotaż) | zrobione: 6 zbiorów × 7 metod × 10 przebiegów CV |
 | Strojenie hiperparametrów | do zrobienia (pilotaż na stałych parametrach) |
@@ -35,33 +35,33 @@ Parametry stałe: B=10, M=200, max_depth=3, learning_rate=0.1, α=β=1, k=20, p=
 | Zbiór | wine | breast_cancer | auto_mpg | banknote | yacht | concrete |
 |---|---|---|---|---|---|---|
 | Drzewa (+2 vs Baseline) | −36% | −27% | −44% | −6% | −6% | −1% |
-| Czas (+2 vs Baseline) | −7% | −20% | −29% | +19% | +71% | +32% |
+| Czas (+2 vs Baseline) | −21% | −24% | −37% | +2% | +8% | +8% |
 
 **Obserwacje:**
 - Adaptive Sampling (+1) poprawia Baseline na 5 z 6 zbiorów; w klasyfikacji wariant +1+2 ma najlepszą średnią rangę. Różnice mieszczą się jednak w odchyleniu standardowym – przy 6 zbiorach to obserwacja, nie wniosek.
 - Na regresji pojedynczy GBDT jest konkurencyjny (najlepszy na concrete i yacht), a na auto_mpg wygrywają Bagging i RF.
-- Early Stopping zmniejsza liczbę drzew bez utraty jakości tam, gdzie GBDT szybko się nasyca. Gdzie strata walidacyjna spada aż do M=200, ES prawie nie przycina modeli, a narzut checkpointów wydłuża trening.
+- Early Stopping zmniejsza liczbę drzew (22–46%) i czas treningu (19–41%) bez utraty jakości tam, gdzie GBDT szybko się nasyca. Gdzie strata walidacyjna spada aż do M=200 (banknote, yacht, concrete), ES prawie nie przycina modeli, a koszt checkpointów to +2–8% czasu.
 
 ## 3. Doprecyzowania i odstępstwa od planu
 
 1. **Kryterium stopu ES:** log-loss (klasyfikacja) i MAE (regresja) zespołu na walidacji wewnętrznej, zamiast Macro F1. F1 na małej walidacji (np. 29 obserwacji w Wine) zmienia się skokowo i powodował zbyt wczesne zatrzymanie. Poprawa = spadek straty o więcej niż 0,1%.
 2. **Normalizacja e_i, d_i w Adaptive Sampling:** podział przez kwantyl 99% i obcięcie do 1, zamiast podziału przez maksimum – pojedyncza obserwacja odstająca nie spłaszcza wag pozostałych. Przy α=β=1 wagi mieszczą się w [1, 3]; efektywna liczność próbki to 92–96% n.
 3. **Wspólne dane treningowe:** wszystkie metody trenują na tych samych 80% części treningowej foldu; walidację wewnętrzną wykorzystuje tylko ES (a w pełnych eksperymentach – strojenie).
-4. **Koszt:** raportujemy zarówno drzewa w końcowym zespole, jak i drzewa faktycznie zbudowane (z ES także te za najlepszym checkpointem). W klasyfikacji wieloklasowej sklearn buduje K drzew na iterację.
-5. **Dane:** Yacht Hydrodynamics nie jest dostępny przez `ucimlrepo` – pobieramy go bezpośrednio z UCI. Braki liczbowe uzupełniamy medianą z części treningowej foldu (bez wycieku z foldu testowego).
+4. **Przywracanie najlepszego checkpointu ES:** zamiast kopiować model przy każdej poprawie, zapamiętujemy liczbę iteracji i na końcu przycinamy model (test potwierdza identyczne predykcje). Pierwsza wersja z kopiowaniem wydłużała trening nawet o 71%.
+5. **Koszt:** raportujemy zarówno drzewa w końcowym zespole, jak i drzewa faktycznie zbudowane (z ES także te za najlepszym checkpointem). W klasyfikacji wieloklasowej sklearn buduje K drzew na iterację.
+6. **Dane:** Yacht Hydrodynamics nie jest dostępny przez `ucimlrepo` – pobieramy go bezpośrednio z UCI. Braki liczbowe uzupełniamy medianą z części treningowej foldu (bez wycieku z foldu testowego).
 
 ## 4. Problemy i ryzyka
 
 | Ryzyko | Plan działania |
 |---|---|
-| Narzut ES (kopiowanie modelu, predykcja walidacji od zera na każdym checkpoincie) | Zapamiętywać tylko liczbę iteracji i przycinać model na końcu; predykcje walidacyjne aktualizować przyrostowo |
 | ES nie przycina modeli przy M=200 (regresja) | Rozważyć wyższy limit M dla wariantów z ES (np. 500) – do decyzji |
-| Czas pełnych eksperymentów: ok. 63 h na 1 rdzeniu ze strojeniem, ok. 8 h na 8 rdzeniach; Dry Bean i Mushroom to ok. 80% kosztu | Zrównoleglenie po foldach; w razie potrzeby zawężenie siatki dla dużych zbiorów lub `HistGradientBoosting` |
+| Czas pełnych eksperymentów: ok. 57 h na 1 rdzeniu ze strojeniem, ok. 7 h na 8 rdzeniach; Dry Bean i Mushroom to ok. 80% kosztu | Zrównoleglenie po foldach; w razie potrzeby zawężenie siatki dla dużych zbiorów lub `HistGradientBoosting` |
 | Mała liczba zbiorów w pilotażu | Wnioski dopiero po 24 zbiorach i testach Friedmana/Wilcoxona |
 
 ## 5. Plan do 24.11
 
-- **11–14.11** – loadery pozostałych 18 zbiorów, poprawa narzutu ES, strojenie (random search, do 8 konfiguracji), uruchomienie pełnych eksperymentów
+- **11–14.11** – loadery pozostałych 18 zbiorów, strojenie (random search, do 8 konfiguracji), uruchomienie pełnych eksperymentów
 - **15–17.11** – tabele wyników, rankingi, test Friedmana i testy Wilcoxona, analiza kosztu
 - **18–24.11** – raport końcowy, prezentacja, uporządkowanie kodu
 

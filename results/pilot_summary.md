@@ -1,6 +1,6 @@
 # Pilotaż – wyniki
 
-Wygenerowano: 2026-11-08 22:33. 2×5-fold CV (ziarna (42, 2026)), stałe hiperparametry: `{'B': 10, 'M': 200, 'max_depth': 3, 'learning_rate': 0.1, 'alpha': 1.0, 'beta': 1.0, 'k': 20, 'p': 2}`. Referencje Bagging/RF: `{'n_estimators': 100}`.
+Wygenerowano: 2026-11-08 22:44. 2×5-fold CV (ziarna (42, 2026)), stałe hiperparametry: `{'B': 10, 'M': 200, 'max_depth': 3, 'learning_rate': 0.1, 'alpha': 1.0, 'beta': 1.0, 'k': 20, 'p': 2}`. Referencje Bagging/RF: `{'n_estimators': 100}`.
 
 ## Klasyfikacja – Macro F1 (↑), średnia ± std z 10 przebiegów
 
@@ -30,33 +30,33 @@ Wygenerowano: 2026-11-08 22:33. 2×5-fold CV (ziarna (42, 2026)), stałe hiperpa
 |:------|-------:|----------:|-----:|-----------:|-------------:|-------------:|---------------:|
 | ranga |      3 |         5 | 4.67 |       3.67 |         2.67 |            5 |              4 |
 
-## Koszt: zbudowane drzewa i czas treningu (średnia na fold)
+## Koszt: zbudowane drzewa / czas treningu [s] (średnia na fold)
 
-| dataset       |   ('GBDT', 'drzewa (zbud.)') |   ('GBDT', 'fit [s]') |   ('Bagging', 'drzewa (zbud.)') |   ('Bagging', 'fit [s]') |   ('RF', 'drzewa (zbud.)') |   ('RF', 'fit [s]') |   ('Baseline', 'drzewa (zbud.)') |   ('Baseline', 'fit [s]') |   ('Baseline+1', 'drzewa (zbud.)') |   ('Baseline+1', 'fit [s]') |   ('Baseline+2', 'drzewa (zbud.)') |   ('Baseline+2', 'fit [s]') |   ('Baseline+1+2', 'drzewa (zbud.)') |   ('Baseline+1+2', 'fit [s]') |
-|:--------------|-----------------------------:|----------------------:|--------------------------------:|-------------------------:|---------------------------:|--------------------:|---------------------------------:|--------------------------:|-----------------------------------:|----------------------------:|-----------------------------------:|----------------------------:|-------------------------------------:|------------------------------:|
-| auto_mpg      |                          200 |                  0.06 |                             100 |                     0.08 |                        100 |                0.06 |                             2000 |                      0.57 |                               2000 |                        0.56 |                               1112 |                        0.4  |                                 1070 |                          0.38 |
-| banknote      |                          200 |                  0.16 |                             100 |                     0.11 |                        100 |                0.07 |                             2000 |                      1.59 |                               2000 |                        1.61 |                               1888 |                        1.89 |                                 1894 |                          1.91 |
-| breast_cancer |                          200 |                  0.29 |                             100 |                     0.17 |                        100 |                0.06 |                             2000 |                      2.73 |                               2000 |                        2.75 |                               1456 |                        2.19 |                                 1566 |                          2.4  |
-| concrete      |                          200 |                  0.11 |                             100 |                     0.14 |                        100 |                0.12 |                             2000 |                      1.04 |                               2000 |                        1.04 |                               1990 |                        1.37 |                                 1992 |                          1.37 |
-| wine          |                          600 |                  0.17 |                             100 |                     0.07 |                        100 |                0.04 |                             6000 |                      1.57 |                               6000 |                        1.59 |                               3852 |                        1.46 |                                 3714 |                          1.41 |
-| yacht         |                          200 |                  0.06 |                             100 |                     0.09 |                        100 |                0.07 |                             2000 |                      0.56 |                               2000 |                        0.57 |                               1886 |                        0.96 |                                 1906 |                          0.97 |
+| dataset       | GBDT       | Bagging    | RF         | Baseline    | Baseline+1   | Baseline+2   | Baseline+1+2   |
+|:--------------|:-----------|:-----------|:-----------|:------------|:-------------|:-------------|:---------------|
+| auto_mpg      | 200 / 0.05 | 100 / 0.07 | 100 / 0.05 | 2000 / 0.50 | 2000 / 0.51  | 1112 / 0.31  | 1070 / 0.30    |
+| banknote      | 200 / 0.15 | 100 / 0.10 | 100 / 0.07 | 2000 / 1.42 | 2000 / 1.43  | 1888 / 1.46  | 1894 / 1.47    |
+| breast_cancer | 200 / 0.29 | 100 / 0.17 | 100 / 0.06 | 2000 / 2.75 | 2000 / 2.77  | 1456 / 2.10  | 1566 / 2.26    |
+| concrete      | 200 / 0.11 | 100 / 0.14 | 100 / 0.12 | 2000 / 1.03 | 2000 / 1.04  | 1990 / 1.11  | 1992 / 1.12    |
+| wine          | 600 / 0.24 | 100 / 0.09 | 100 / 0.06 | 6000 / 2.13 | 6000 / 2.19  | 3852 / 1.69  | 3714 / 1.64    |
+| yacht         | 200 / 0.04 | 100 / 0.06 | 100 / 0.04 | 2000 / 0.37 | 2000 / 0.38  | 1886 / 0.40  | 1906 / 0.41    |
 
 ## Oszczędność Ensemble-Aware ES
 
 | dataset       | porównanie                 | drzewa   | czas   |
 |:--------------|:---------------------------|:---------|:-------|
-| wine          | Baseline+2 vs Baseline     | -36%     | -7%    |
-| wine          | Baseline+1+2 vs Baseline+1 | -38%     | -11%   |
-| breast_cancer | Baseline+2 vs Baseline     | -27%     | -20%   |
-| breast_cancer | Baseline+1+2 vs Baseline+1 | -22%     | -13%   |
-| banknote      | Baseline+2 vs Baseline     | -6%      | +19%   |
-| banknote      | Baseline+1+2 vs Baseline+1 | -5%      | +19%   |
-| yacht         | Baseline+2 vs Baseline     | -6%      | +71%   |
-| yacht         | Baseline+1+2 vs Baseline+1 | -5%      | +71%   |
-| auto_mpg      | Baseline+2 vs Baseline     | -44%     | -29%   |
-| auto_mpg      | Baseline+1+2 vs Baseline+1 | -46%     | -33%   |
-| concrete      | Baseline+2 vs Baseline     | -1%      | +32%   |
-| concrete      | Baseline+1+2 vs Baseline+1 | -0%      | +31%   |
+| wine          | Baseline+2 vs Baseline     | -36%     | -21%   |
+| wine          | Baseline+1+2 vs Baseline+1 | -38%     | -25%   |
+| breast_cancer | Baseline+2 vs Baseline     | -27%     | -24%   |
+| breast_cancer | Baseline+1+2 vs Baseline+1 | -22%     | -19%   |
+| banknote      | Baseline+2 vs Baseline     | -6%      | +2%    |
+| banknote      | Baseline+1+2 vs Baseline+1 | -5%      | +3%    |
+| yacht         | Baseline+2 vs Baseline     | -6%      | +8%    |
+| yacht         | Baseline+1+2 vs Baseline+1 | -5%      | +8%    |
+| auto_mpg      | Baseline+2 vs Baseline     | -44%     | -37%   |
+| auto_mpg      | Baseline+1+2 vs Baseline+1 | -46%     | -41%   |
+| concrete      | Baseline+2 vs Baseline     | -1%      | +8%    |
+| concrete      | Baseline+1+2 vs Baseline+1 | -0%      | +7%    |
 
 ## Szacunek czasu pełnych eksperymentów
 
@@ -64,31 +64,31 @@ Model: czas ~ c_metoda · n·log n · d · K, c z pilotażu; d dla nowych zbior�
 
 | dataset            |     n |   d≈ |   K |   1 przebieg CV, wszystkie metody [min] |
 |:-------------------|------:|-----:|----:|----------------------------------------:|
-| dry_bean           | 13611 |   16 |   7 |                                   343.7 |
-| mushroom           |  8124 |  117 |   2 |                                   202.1 |
-| spambase           |  4601 |   57 |   2 |                                    52.1 |
-| car                |  1728 |   21 |   4 |                                    25.3 |
-| wine_quality_white |  4898 |   11 |   1 |                                    10.8 |
-| german_credit      |  1000 |   61 |   2 |                                     9.8 |
-| ccpp               |  9568 |    4 |   1 |                                     8.3 |
-| abalone            |  4177 |   10 |   1 |                                     8.2 |
-| student_por        |   649 |   56 |   1 |                                     5.4 |
-| rice               |  3810 |    7 |   2 |                                     5.2 |
-| breast_cancer      |   569 |   30 |   2 |                                     2.5 |
-| forest_fires       |   517 |   29 |   1 |                                     2.2 |
-| ionosphere         |   351 |   34 |   2 |                                     1.6 |
-| sonar              |   208 |   60 |   2 |                                     1.5 |
-| glass              |   214 |    9 |   6 |                                     1.4 |
-| concrete           |  1030 |    8 |   1 |                                     1.3 |
-| airfoil            |  1503 |    5 |   1 |                                     1.3 |
+| dry_bean           | 13611 |   16 |   7 |                                   310.4 |
+| mushroom           |  8124 |  117 |   2 |                                   182.6 |
+| spambase           |  4601 |   57 |   2 |                                    47   |
+| car                |  1728 |   21 |   4 |                                    22.8 |
+| wine_quality_white |  4898 |   11 |   1 |                                     9.7 |
+| german_credit      |  1000 |   61 |   2 |                                     8.8 |
+| ccpp               |  9568 |    4 |   1 |                                     7.5 |
+| abalone            |  4177 |   10 |   1 |                                     7.4 |
+| student_por        |   649 |   56 |   1 |                                     4.9 |
+| rice               |  3810 |    7 |   2 |                                     4.7 |
+| breast_cancer      |   569 |   30 |   2 |                                     2.3 |
+| forest_fires       |   517 |   29 |   1 |                                     2   |
+| ionosphere         |   351 |   34 |   2 |                                     1.5 |
+| sonar              |   208 |   60 |   2 |                                     1.4 |
+| glass              |   214 |    9 |   6 |                                     1.3 |
+| concrete           |  1030 |    8 |   1 |                                     1.2 |
+| airfoil            |  1503 |    5 |   1 |                                     1.2 |
 | energy             |   768 |    8 |   1 |                                     0.9 |
-| banknote           |  1372 |    4 |   2 |                                     0.9 |
-| wine               |   178 |   13 |   3 |                                     0.8 |
-| auto_mpg           |   398 |    9 |   1 |                                     0.5 |
+| banknote           |  1372 |    4 |   2 |                                     0.8 |
+| wine               |   178 |   13 |   3 |                                     0.7 |
+| auto_mpg           |   398 |    9 |   1 |                                     0.4 |
 | real_estate        |   414 |    6 |   1 |                                     0.3 |
 | yacht              |   308 |    6 |   1 |                                     0.2 |
-| computer_hardware  |   209 |    6 |   1 |                                     0.2 |
+| computer_hardware  |   209 |    6 |   1 |                                     0.1 |
 
-- **bez strojenia [h, 1 rdzeń]**: 11.4
-- **ze strojeniem [h, 1 rdzeń]**: 62.7
-- **ze strojeniem [h, 8 rdzeni]**: 7.8
+- **bez strojenia [h, 1 rdzeń]**: 10.3
+- **ze strojeniem [h, 1 rdzeń]**: 56.6
+- **ze strojeniem [h, 8 rdzeni]**: 7.1

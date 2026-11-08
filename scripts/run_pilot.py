@@ -103,11 +103,8 @@ def cost_table(df: pd.DataFrame) -> pd.DataFrame:
         trees=("n_trees", "mean"), trained=("n_trees_trained", "mean"),
         stages=("n_stages_mean", "mean"), fit=("fit_time", "mean"),
         pred=("predict_time", "mean"))
-    out = pd.DataFrame({
-        "drzewa (zbud.)": g.trained.round(0).astype(int).astype(str),
-        "fit [s]": g.fit.map("{:.2f}".format),
-    })
-    return out.unstack("method").swaplevel(axis=1)[order]
+    cell = g.trained.round(0).astype(int).astype(str) + " / " + g.fit.map("{:.2f}".format)
+    return cell.unstack("method")[order]
 
 
 def es_savings(df: pd.DataFrame) -> pd.DataFrame:
@@ -184,7 +181,7 @@ def report() -> None:
                   "Średnia pozycja w rankingu (1 = najlepsza):\n",
                   avg_ranks(d, task).round(2).to_frame("ranga").T.to_markdown(), ""]
 
-    lines += ["## Koszt: zbudowane drzewa i czas treningu (średnia na fold)\n",
+    lines += ["## Koszt: zbudowane drzewa / czas treningu [s] (średnia na fold)\n",
               cost_table(df).to_markdown(), "",
               "## Oszczędność Ensemble-Aware ES\n",
               es_savings(df).to_markdown(index=False), ""]

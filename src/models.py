@@ -7,7 +7,6 @@ Etap 6: Ensemble-Aware ES   -> `_fit_one`.
 
 from __future__ import annotations
 
-import copy
 import time
 
 import numpy as np
@@ -167,8 +166,10 @@ class BaggedGBDT(BaseEstimator):
         Baseline: stałe M drzew.
         Ensemble-Aware ES: co k iteracji checkpoint – strata walidacyjna całego zespołu
         (gotowe modele + bieżący). Poprawa = spadek straty o więcej niż es_tol
-        (względnie, np. 1e-3 = 0.1%). Przy poprawie zapamiętujemy kopię modelu; po p
-        checkpointach bez poprawy (lub po M iteracjach) zwracamy najlepszą kopię.
+        (względnie, np. 1e-3 = 0.1%). Przy poprawie zapamiętujemy liczbę iteracji; po p
+        checkpointach bez poprawy (lub po M iteracjach) przycinamy model do najlepszego
+        checkpointu (pierwsze iteracje boostingu nie zależą od późniejszych, więc
+        przycięty model jest identyczny z wytrenowanym od razu na tylu iteracjach).
         """
         if not self.ensemble_es:
             model = self._new_gbdt(seed).fit(X, y)
@@ -177,15 +178,15 @@ class BaggedGBDT(BaseEstimator):
 
         n_done = len(self.estimators_)
         model = self._new_gbdt(seed, n_estimators=self.k, warm_start=True)
-        best_loss, best_model, no_improve, history = np.inf, None, 0, []
+        best_loss, best_n, no_improve, history = np.inf, None, 0, []
         while True:
             model.fit(X, y)
             out = self._model_output(model, X_val)
             ens = out if self._val_sum is None else (self._val_sum + out) / (n_done + 1)
             loss = self._es_loss(y_val, ens)
             history.append((model.n_estimators_, loss))
-            if loss < best_loss * (1.0 - self.es_tol) or best_model is None:
-                best_loss, best_model, no_improve = loss, copy.deepcopy(model), 0
+            if best_n is None or loss < best_loss * (1.0 - self.es_tol):
+                best_loss, best_n, no_improve = loss, model.n_estimators_, 0
             else:
                 no_improve += 1
             if no_improve >= self.p or model.n_estimators_ >= self.M:
@@ -194,8 +195,7 @@ class BaggedGBDT(BaseEstimator):
 
         self._n_trained += model.estimators_.size
         self.es_history_.append(history)
-        best_model.warm_start = False
-        return best_model
+        return _truncate_gbdt(model, best_n)
 
     def _es_loss(self, y_val: np.ndarray, ens: np.ndarray) -> float:
         """Strata walidacyjna zespołu (mniejsza = lepsza).
@@ -252,6 +252,24 @@ class BaggedGBDT(BaseEstimator):
 
     def _aggregate(self, models, X: np.ndarray) -> np.ndarray:
         return np.mean([self._model_output(m, X) for m in models], axis=0)
+
+
+# --------------------------------------------------------------------------- #
+# Funkcje pomocnicze Early Stopping
+# --------------------------------------------------------------------------- #
+
+def _truncate_gbdt(model, n: int):
+    """Przycina wytrenowany GBDT sklearn do pierwszych n iteracji (w miejscu).
+
+    Tańsze niż deepcopy na każdym checkpoincie. Poprawność (identyczne predykcje
+    jak model trenowany od razu na n iteracjach) sprawdza tests/test_models.py.
+    """
+    model.estimators_ = model.estimators_[:n]
+    model.train_score_ = model.train_score_[:n]
+    model.n_estimators_ = n
+    model.n_estimators = n
+    model.warm_start = False
+    return model
 
 
 # --------------------------------------------------------------------------- #
