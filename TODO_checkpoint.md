@@ -23,13 +23,13 @@ Termin: wtorek 10.11. Do dyspozycji: reszta niedzieli 8.11 + poniedziałek 9.11.
 **Gotowe gdy:** `import src` działa.
 
 ## Etap 2 – Dane (niedziela)
-- [ ] `load_dataset(name) -> (X, y, task)` dla 6 zbiorów pilotażowych przez `ucimlrepo`:
+- [x] `load_dataset(name) -> (X, y, task)` dla 6 zbiorów pilotażowych przez `ucimlrepo`:
   - clf: Wine (109), Breast Cancer (17), Banknote (267)
   - reg: Yacht (243), Auto MPG (9), Concrete (165)
-- [ ] Preprocessing: mediana dla liczbowych, najczęstsza wartość dla kategorycznych, one-hot, label encoding y dla clf
-- [ ] Cache na dysku (`data/*.csv`)
+- [x] Preprocessing: mediana dla liczbowych, najczęstsza wartość dla kategorycznych, one-hot, label encoding y dla clf
+- [x] Cache na dysku (`data/*.csv`)
 
-**Gotowe gdy:** wszystkie 6 zbiorów ładuje się bez NaN.
+**Gotowe gdy:** wszystkie 6 zbiorów się ładuje. NaN w cechach liczbowych (Auto MPG: 6) uzupełnia `impute_median` w obrębie foldu (bez wycieku). Yacht pobierany bezpośrednio z UCI (brak w `ucimlrepo`).
 
 ## Etap 3 – Baseline: Bagging + GBDT (niedziela)
 - [ ] Klasa `BaggedGBDT(task, B, M, max_depth, lr, adaptive_sampling=False, ensemble_es=False, alpha, beta, k, p, random_state)`
