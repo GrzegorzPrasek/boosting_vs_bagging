@@ -95,6 +95,11 @@ def compute_metrics(task: str, y_true: np.ndarray, y_pred: np.ndarray) -> dict:
 
 MAIN_METRIC = {"clf": "f1_macro", "reg": "mae"}
 
+# Stały układ kolumn CSV (clf i reg w jednym pliku; metryki drugiego typu = NaN)
+ROW_COLUMNS = ["dataset", "task", "method", "seed", "fold", "n_train", "n_val", "n_test",
+               "f1_macro", "accuracy", "mae", "rmse",
+               "fit_time", "predict_time", "n_trees", "n_trees_trained", "n_stages_mean"]
+
 
 # --------------------------------------------------------------------------- #
 # Podziały
@@ -159,13 +164,14 @@ def run_cv(dataset: str, methods=ALL_METHODS, params: dict | None = None,
                 log(f"{dataset:14s} s={seed} f={fold} {method:13s} "
                     f"{m}={row[m]:.4f} t={fit_time:.2f}s trees={n_trees}")
 
-    return pd.DataFrame(rows)
+    return pd.DataFrame(rows).reindex(columns=ROW_COLUMNS)
 
 
 def _append_row(path: str | Path, row: dict) -> None:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame([row]).to_csv(path, mode="a", header=not path.exists(), index=False)
+    pd.DataFrame([row]).reindex(columns=ROW_COLUMNS).to_csv(
+        path, mode="a", header=not path.exists(), index=False)
 
 
 # --------------------------------------------------------------------------- #

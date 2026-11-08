@@ -1,0 +1,66 @@
+{
+  "date": "2026-11-08T22:28:02",
+  "params": {
+    "B": 10,
+    "M": 200,
+    "max_depth": 3,
+    "learning_rate": 0.1,
+    "alpha": 1.0,
+    "beta": 1.0,
+    "k": 20,
+    "p": 2
+  },
+  "ref_params": {
+    "n_estimators": 100
+  },
+  "cv_seeds": [
+    42,
+    2026
+  ],
+  "n_folds": 5,
+  "datasets": {
+    "clf": [
+      "wine",
+      "breast_cancer",
+      "banknote"
+    ],
+    "reg": [
+      "yacht",
+      "auto_mpg",
+      "concrete"
+    ]
+  },
+  "methods": [
+    "GBDT",
+    "Bagging",
+    "RF",
+    "Baseline",
+    "Baseline+1",
+    "Baseline+2",
+    "Baseline+1+2"
+  ],
+  "bagged_variants": {
+    "Baseline": {
+      "adaptive_sampling": false,
+      "ensemble_es": false
+    },
+    "Baseline+1": {
+      "adaptive_sampling": true,
+      "ensemble_es": false
+    },
+    "Baseline+2": {
+      "adaptive_sampling": false,
+      "ensemble_es": true
+    },
+    "Baseline+1+2": {
+      "adaptive_sampling": true,
+      "ensemble_es": true
+    }
+  },
+  "python": "3.12.10",
+  "sklearn": "1.9.1",
+  "numpy": "2.5.4",
+  "pandas": "3.1.1",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "cpu_count": 16
+}
