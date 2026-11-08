@@ -52,12 +52,15 @@ Termin: wtorek 10.11. Do dyspozycji: reszta niedzieli 8.11 + poniedziałek 9.11.
 **Gotowe gdy:** pipeline działa end-to-end dla baseline + 3 referencji na 1 zbiorze.
 
 ## Etap 5 – Modyfikacja 1: Adaptive Sampling (poniedziałek)
-- [ ] Modele trenowane sekwencyjnie; model 1 zwykły bootstrap
-- [ ] Przed modelem b: predykcje OOB modeli 1..b-1 (dla obs. i tylko modele, które jej nie widziały)
-- [ ] `e_i`: błąd OOB zespołu (reg: |y − ŷ|; clf: 1 − p(prawdziwej klasy)), normalizacja do [0,1]
-- [ ] `d_i`: rozbieżność modeli (reg: std predykcji; clf: średnia wariancja proba), normalizacja do [0,1]
-- [ ] Obserwacje bez predykcji OOB: `e_i = d_i = 0`
-- [ ] `w_i = 1 + α·e_i + β·d_i`, `P(i) = w_i / Σw`, losowanie N obserwacji ze zwracaniem
+- [x] Modele trenowane sekwencyjnie; model 1 zwykły bootstrap
+- [x] Przed modelem b: predykcje OOB modeli 1..b-1 (dla obs. i tylko modele, które jej nie widziały)
+- [x] `e_i`: błąd OOB zespołu (reg: |y − ŷ|; clf: 1 − p(prawdziwej klasy)), normalizacja do [0,1]
+- [x] `d_i`: rozbieżność modeli (reg: std predykcji; clf: średnia wariancja proba), normalizacja do [0,1]
+- [x] Obserwacje bez predykcji OOB: `e_i = d_i = 0`
+- [x] `w_i = 1 + α·e_i + β·d_i`, `P(i) = w_i / Σw`, losowanie N obserwacji ze zwracaniem
+
+- Normalizacja e_i, d_i: podział przez kwantyl 99% i obcięcie do 1 (odporne na outliery)
+- Diagnostyka w `sampling_stats_` (min/max P(i)·n, efektywna liczność, pokrycie OOB)
 
 **Gotowe gdy:** wariant +1 działa, rozkład P(i) nie jest zdegenerowany (sprawdzić min/max).
 
