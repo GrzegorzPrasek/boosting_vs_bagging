@@ -77,20 +77,23 @@ Termin: wtorek 10.11. Do dyspozycji: reszta niedzieli 8.11 + poniedziałek 9.11.
 **Gotowe gdy:** wariant +2 kończy z mniej niż B·M drzewami na części zbiorów.
 
 ## Etap 7 – Pilotaż (poniedziałek wieczór)
-- [ ] `scripts/run_pilot.py`: 6 zbiorów × 7 metod × 10 foldów
-- [ ] Najpierw test na 1 zbiorze i 1 foldzie, potem pełne uruchomienie
-- [ ] Tabela: średnia ± std metryki głównej (metoda × zbiór)
-- [ ] Tabela: średnia liczba drzew i czas treningu (metoda × zbiór)
-- [ ] Oszacowanie czasu pełnych eksperymentów (24 zbiory + strojenie 8 konfiguracji), zwłaszcza Dry Bean i CCPP
+- [x] `scripts/run_pilot.py`: 6 zbiorów × 7 metod × 10 foldów
+- [x] Najpierw test na 1 zbiorze i 1 foldzie, potem pełne uruchomienie
+- [x] Tabela: średnia ± std metryki głównej (metoda × zbiór)
+- [x] Tabela: średnia liczba drzew i czas treningu (metoda × zbiór)
+- [x] Oszacowanie czasu pełnych eksperymentów (24 zbiory + strojenie 8 konfiguracji), zwłaszcza Dry Bean i CCPP
+
+- Wynik: `results/pilot_summary.md` (+ `pilot.csv`, `pilot_meta.json`, `pilot_log.txt`)
 
 **Gotowe gdy:** obie tabele są w `results/` i jest szacunek czasu.
 
 ## Etap 8 – Materiał na checkpoint (wtorek rano)
-- [ ] Co jest zrobione (4 warianty + referencje, pipeline, pilotaż)
-- [ ] Pierwsze obserwacje (ile drzew oszczędza ES, czy AS zmienia wynik)
-- [ ] Odstępstwa od planu (stałe hiperparametry w pilotażu, brak strojenia)
-- [ ] Ryzyka: czas obliczeń na dużych zbiorach (plan B: `HistGradientBoosting*` / zawężenie siatki)
-- [ ] Plan do 24.11:
+Dokument: `docs/checkpoint_2026-11-10.md`
+- [x] Co jest zrobione (4 warianty + referencje, pipeline, pilotaż)
+- [x] Pierwsze obserwacje (ile drzew oszczędza ES, czy AS zmienia wynik)
+- [x] Odstępstwa od planu (stałe hiperparametry w pilotażu, brak strojenia)
+- [x] Ryzyka: czas obliczeń na dużych zbiorach (plan B: `HistGradientBoosting*` / zawężenie siatki)
+- [x] Plan do 24.11:
   - 11–14.11: pozostałe 18 zbiorów, strojenie, pełne eksperymenty
   - 15–17.11: analiza, rankingi, Friedman + Wilcoxon
   - 18–24.11: raport, prezentacja, porządki w kodzie
