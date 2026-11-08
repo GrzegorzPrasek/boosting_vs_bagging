@@ -38,6 +38,7 @@ Parametry stałe: B=10, M=200, max_depth=3, learning_rate=0.1, α=β=1, k=20, p=
 | Czas (+2 vs Baseline) | −21% | −24% | −37% | +2% | +8% | +8% |
 
 **Obserwacje:**
+
 - Adaptive Sampling (+1) poprawia Baseline na 5 z 6 zbiorów; w klasyfikacji wariant +1+2 ma najlepszą średnią rangę. Różnice mieszczą się jednak w odchyleniu standardowym – przy 6 zbiorach to obserwacja, nie wniosek.
 - Na regresji pojedynczy GBDT jest konkurencyjny (najlepszy na concrete i yacht), a na auto_mpg wygrywają Bagging i RF.
 - Early Stopping zmniejsza liczbę drzew (22–46%) i czas treningu (19–41%) bez utraty jakości tam, gdzie GBDT szybko się nasyca. Gdzie strata walidacyjna spada aż do M=200 (banknote, yacht, concrete), ES prawie nie przycina modeli, a koszt checkpointów to +2–8% czasu.
