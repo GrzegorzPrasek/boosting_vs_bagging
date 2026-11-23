@@ -57,10 +57,15 @@ def make_model(method: str, task: str, params: dict, seed: int):
     if method == "Bagging":
         cls, tree = (BaggingClassifier, DecisionTreeClassifier) if clf \
             else (BaggingRegressor, DecisionTreeRegressor)
-        return cls(estimator=tree(), n_estimators=REF_PARAMS["n_estimators"], random_state=seed)
+        return cls(estimator=tree(min_samples_leaf=params.get("min_samples_leaf", 1)),
+                   n_estimators=params.get("n_estimators", REF_PARAMS["n_estimators"]),
+                   max_samples=params.get("max_samples", 1.0), random_state=seed)
     if method == "RF":
         cls = RandomForestClassifier if clf else RandomForestRegressor
-        return cls(n_estimators=REF_PARAMS["n_estimators"], random_state=seed)
+        extra = {"max_features": params["max_features"]} if "max_features" in params else {}
+        return cls(n_estimators=params.get("n_estimators", REF_PARAMS["n_estimators"]),
+                   min_samples_leaf=params.get("min_samples_leaf", 1),
+                   random_state=seed, **extra)
     raise ValueError(f"Nieznana metoda: {method}")
 
 

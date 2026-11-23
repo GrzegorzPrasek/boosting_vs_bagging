@@ -127,3 +127,24 @@ def test_csv_columns_fixed_for_both_tasks(tmp_path):
     assert df.loc[df.task == "clf", "f1_macro"].notna().all()
     assert df.loc[df.task == "clf", "mae"].isna().all()
     assert df.loc[df.task == "reg", "mae"].notna().all()
+
+
+# --------------------------------------------------------------------------- #
+# Strojenie
+# --------------------------------------------------------------------------- #
+
+def test_tuning_common_random_numbers():
+    from src.tuning import BASE_SPACE, sample_configs
+    cfgs = {m: sample_configs(m, 42, 3) for m in
+            ("Baseline", "Baseline+1", "Baseline+2", "Baseline+1+2")}
+    base_keys = list(BASE_SPACE)
+    for i in range(8):
+        bases = {m: tuple(c[i][k] for k in base_keys) for m, c in cfgs.items()}
+        assert len(set(bases.values())) == 1                     # ta sama baza
+        assert (cfgs["Baseline+1"][i]["alpha"], cfgs["Baseline+1"][i]["beta"]) == \
+               (cfgs["Baseline+1+2"][i]["alpha"], cfgs["Baseline+1+2"][i]["beta"])
+        assert (cfgs["Baseline+2"][i]["k"], cfgs["Baseline+2"][i]["p"]) == \
+               (cfgs["Baseline+1+2"][i]["k"], cfgs["Baseline+1+2"][i]["p"])
+    # 8 różnych konfiguracji bazowych (16 możliwych, bez powtórzeń)
+    assert len({tuple(c[k] for k in base_keys) for c in cfgs["Baseline"]}) == 8
+    assert sample_configs("GBDT", 42, 3) == sample_configs("GBDT", 42, 3)

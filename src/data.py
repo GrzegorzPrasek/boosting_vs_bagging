@@ -50,8 +50,17 @@ def _load_yacht() -> pd.DataFrame:
     return pd.read_csv(io.StringIO(raw), sep=r"\s+", header=None, names=cols)
 
 
+def _load_wine_quality_white() -> pd.DataFrame:
+    """ucimlrepo łączy wina czerwone i białe; plan: tylko winequality-white."""
+    from ucimlrepo import fetch_ucirepo
+
+    df = fetch_ucirepo(id=186).data.original
+    df = df[df["color"] == "white"].drop(columns=["color"])
+    return df.rename(columns={"quality": TARGET}).reset_index(drop=True)
+
+
 # --------------------------------------------------------------------------- #
-# Rejestr zbiorów
+# Rejestr zbiorów (plan, tabele 1 i 2)
 # --------------------------------------------------------------------------- #
 
 DATASETS: dict[str, DatasetSpec] = {
@@ -59,18 +68,45 @@ DATASETS: dict[str, DatasetSpec] = {
     "wine": DatasetSpec("clf", 109),
     "breast_cancer": DatasetSpec("clf", 17),
     "banknote": DatasetSpec("clf", 267),
+    "ionosphere": DatasetSpec("clf", 52),
+    "car": DatasetSpec("clf", 19),
+    "spambase": DatasetSpec("clf", 94),
+    "dry_bean": DatasetSpec("clf", 602),
+    "glass": DatasetSpec("clf", 42),
+    "german_credit": DatasetSpec("clf", 144),
+    "sonar": DatasetSpec("clf", 151),
+    "rice": DatasetSpec("clf", 545),
+    "mushroom": DatasetSpec("clf", 73),
     # regresja
     "yacht": DatasetSpec("reg", 243, loader=_load_yacht),
     "auto_mpg": DatasetSpec("reg", 9, categorical=("origin",)),
     "concrete": DatasetSpec("reg", 165),
+    "abalone": DatasetSpec("reg", 1),
+    "energy": DatasetSpec("reg", 242, target="Y1"),                  # Heating Load
+    "airfoil": DatasetSpec("reg", 291),
+    "ccpp": DatasetSpec("reg", 294),
+    "real_estate": DatasetSpec("reg", 477),
+    "forest_fires": DatasetSpec("reg", 162),
+    "wine_quality_white": DatasetSpec("reg", 186, loader=_load_wine_quality_white),
+    "student_por": DatasetSpec("reg", 320, target="G3"),              # G1, G2 są celami, nie cechami
+    "computer_hardware": DatasetSpec("reg", 29, target="PRP",
+                                     drop=("ERP", "VendorName", "ModelName")),
 }
 
 
 def _fetch_from_uci(spec: DatasetSpec) -> pd.DataFrame:
+    """Cechy z ucimlrepo + kolumna TARGET.
+
+    Cel bierzemy z `targets`; gdy zbiór go tam nie ma (Computer Hardware: PRP jest
+    wśród cech), wyciągamy go z cech. Pozostałe kolumny celów nie trafiają do cech.
+    """
     from ucimlrepo import fetch_ucirepo
 
     d = fetch_ucirepo(id=spec.uci_id)
     X, y = d.data.features.copy(), d.data.targets
+    if spec.target is not None and spec.target in X.columns:
+        X[TARGET] = X.pop(spec.target)
+        return X
     target = spec.target or y.columns[0]
     X[TARGET] = y[target].values
     return X
