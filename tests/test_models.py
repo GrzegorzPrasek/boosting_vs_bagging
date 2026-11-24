@@ -148,3 +148,33 @@ def test_tuning_common_random_numbers():
     # 8 różnych konfiguracji bazowych (16 możliwych, bez powtórzeń)
     assert len({tuple(c[k] for k in base_keys) for c in cfgs["Baseline"]}) == 8
     assert sample_configs("GBDT", 42, 3) == sample_configs("GBDT", 42, 3)
+
+
+# --------------------------------------------------------------------------- #
+# Eksperymenty dodatkowe: szum w etykietach, ablacja Adaptive Sampling
+# --------------------------------------------------------------------------- #
+
+def test_label_noise_rate_and_determinism():
+    from src.tuning import add_label_noise
+    rng = np.random.default_rng(0)
+    y_tr, y_val = rng.integers(0, 3, 4000), rng.integers(0, 3, 1000)
+    a_tr, a_val = add_label_noise("clf", y_tr, y_val, 0.2, 42, 1)
+    b_tr, b_val = add_label_noise("clf", y_tr, y_val, 0.2, 42, 1)
+    assert np.array_equal(a_tr, b_tr) and np.array_equal(a_val, b_val)   # ten sam szum
+    changed = np.mean(np.concatenate([a_tr != y_tr, a_val != y_val]))
+    assert 0.18 < changed < 0.22                     # w klasyfikacji zmiana = inna klasa
+    assert set(np.unique(a_tr)) <= {0, 1, 2}
+    assert add_label_noise("clf", y_tr, y_val, 0.0, 42, 1)[0] is y_tr    # brak szumu
+    r_tr, _ = add_label_noise("reg", y_tr.astype(float), y_val.astype(float), 0.1, 42, 1)
+    assert set(np.unique(r_tr)) <= set(np.unique(y_tr))                 # wartości z y_train
+
+
+def test_ablation_configs():
+    from src.tuning import sample_configs
+    full = sample_configs("Baseline+1", 42, 0)
+    e_only = sample_configs("Baseline+1(e)", 42, 0)
+    d_only = sample_configs("Baseline+1(d)", 42, 0)
+    for f, e, d in zip(full, e_only, d_only):
+        assert e["beta"] == 0 and e["alpha"] == f["alpha"]
+        assert d["alpha"] == 0 and d["beta"] == f["beta"]
+        assert (e["B"], e["M"]) == (f["B"], f["M"]) == (d["B"], d["M"])

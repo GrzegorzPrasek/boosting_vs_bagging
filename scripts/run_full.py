@@ -36,7 +36,7 @@ from joblib import Parallel, delayed, parallel_config  # noqa: E402
 
 from src.config import CV_SEEDS, N_FOLDS, RESULTS_DIR  # noqa: E402
 from src.data import DATASETS, load_dataset  # noqa: E402
-from src.evaluation import ALL_METHODS, BAGGED_VARIANTS  # noqa: E402
+from src.evaluation import ALL_METHODS, VARIANT_FLAGS  # noqa: E402
 from src.tuning import (AS_PAIRS, BAGGING_SPACE, BASE_SPACE, ES_SPACE,  # noqa: E402
                         FULL_COLUMNS, GBDT_SPACE, N_CONFIGS, RF_SPACE, all_tasks, run_task)
 
@@ -51,10 +51,10 @@ def _safe_task(*args, **kwargs):
 
 def _cost_key(task, sizes):
     """Szacowany koszt zadania – najdłuższe uruchamiamy najpierw (lepsze upakowanie)."""
-    ds, method, _, _ = task
+    ds, method = task[0], task[1]
     n, d, k = sizes[ds]
     base = n * np.log2(max(n, 2)) * d * (k if k > 2 else 1)
-    return -base * (10 if method in BAGGED_VARIANTS else 1)
+    return -base * (10 if method in VARIANT_FLAGS else 1)
 
 
 def main() -> None:
@@ -64,6 +64,9 @@ def main() -> None:
     ap.add_argument("--n-configs", type=int, default=N_CONFIGS)
     ap.add_argument("--n-jobs", type=int, default=8)
     ap.add_argument("--out", default=str(RESULTS_DIR / "full.csv"))
+    ap.add_argument("--noise", nargs="*", type=float, default=[0.0],
+                    help="poziomy szumu w etykietach (train+val), np. 0.1 0.2")
+    ap.add_argument("--exclude", nargs="*", default=[], help="zbiory do pominięcia")
     ap.add_argument("--fresh", action="store_true")
     args = ap.parse_args()
 
@@ -71,10 +74,14 @@ def main() -> None:
     if args.fresh and out.exists():
         out.unlink()
 
-    tasks = all_tasks(args.datasets, args.methods)
+    datasets = [d for d in args.datasets if d not in args.exclude]
+    tasks = all_tasks(datasets, args.methods, noises=args.noise)
+    columns = FULL_COLUMNS + ["noise"]
     if out.exists():
-        done = pd.read_csv(out, usecols=["dataset", "method", "seed", "fold"])
-        done_set = set(map(tuple, done.itertuples(index=False, name=None)))
+        done = pd.read_csv(out)
+        columns = list(done.columns)                  # zgodność z istniejącym plikiem
+        nz = done["noise"] if "noise" in done else pd.Series(0.0, index=done.index)
+        done_set = set(zip(done.dataset, done.method, done.seed, done.fold, nz.astype(float)))
         tasks = [t for t in tasks if t not in done_set]
 
     sizes = {}
@@ -86,7 +93,8 @@ def main() -> None:
     meta = {
         "started": datetime.now().isoformat(timespec="seconds"),
         "n_configs": args.n_configs, "n_jobs": args.n_jobs, "cv_seeds": CV_SEEDS,
-        "n_folds": N_FOLDS, "datasets": args.datasets, "methods": args.methods,
+        "n_folds": N_FOLDS, "datasets": datasets, "methods": args.methods,
+        "noise": args.noise,
         "spaces": {"bagged_base": BASE_SPACE, "as_pairs": AS_PAIRS, "es": ES_SPACE,
                    "GBDT": GBDT_SPACE, "Bagging": BAGGING_SPACE, "RF": RF_SPACE},
         "python": platform.python_version(), "sklearn": sklearn.__version__,
@@ -110,18 +118,18 @@ def main() -> None:
                 print(f"[BŁĄD] {err[0]}", flush=True)
                 continue
             n_ok += 1
-            pd.DataFrame([row]).reindex(columns=FULL_COLUMNS).to_csv(
+            pd.DataFrame([row]).reindex(columns=columns).to_csv(
                 out, mode="a", header=not out.exists(), index=False)
             el = time.time() - t_start
             eta = el / (n_ok + n_err) * (len(tasks) - n_ok - n_err)
             print(f"[{n_ok + n_err}/{len(tasks)}] {row['dataset']:18s} {row['method']:13s} "
-                  f"s={row['seed']} f={row['fold']} tune={row['tune_time']:.0f}s "
+                  f"s={row['seed']} f={row['fold']} nz={row['noise']} tune={row['tune_time']:.0f}s "
                   f"| {el / 60:.0f} min, ETA ~{eta / 60:.0f} min", flush=True)
 
     meta.update(finished=datetime.now().isoformat(timespec="seconds"),
                 wall_time_min=round((time.time() - t_start) / 60, 1),
                 tasks_ok=n_ok, tasks_failed=n_err)
-    out.with_name(out.stem + "_meta.json").write_text(
+    out.with_name(out.stem + f"_meta_{datetime.now():%H%M%S}.json").write_text(
         json.dumps(meta, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"Koniec: {n_ok} OK, {n_err} błędów, {(time.time() - t_start) / 60:.1f} min")
 

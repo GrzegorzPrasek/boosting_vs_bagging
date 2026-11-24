@@ -6,7 +6,22 @@
 
 ## Streszczenie
 
-Badamy bagging modeli Gradient Boosting (BaggedGBDT) z dwiema modyfikacjami: **Adaptive Sampling**, który losuje próbki dla kolejnych modeli z wagami zależnymi od błędu i rozbieżności predykcji out-of-bag dotychczasowego zespołu, oraz **Ensemble-Aware Early Stopping**, który dobiera liczbę drzew każdego modelu na podstawie straty całego zespołu na walidacji. Cztery warianty (Baseline, +1, +2, +1+2) porównujemy z GBDT, baggingiem drzew i Random Forest na 24 zbiorach UCI (12 klasyfikacyjnych, 12 regresyjnych), stosując 2×5-krotną walidację krzyżową ze strojeniem hiperparametrów w każdym foldzie. Adaptive Sampling istotnie poprawia Macro F1 w klasyfikacji (lepszy wynik na 11 z 12 zbiorów, p = 0,006 po korekcie Holma; najlepsza średnia ranga wśród 7 metod), ale nie poprawia jakości w regresji. Early Stopping zmniejsza liczbę budowanych drzew o ok. 18% i czas treningu o ok. 10% bez istotnej zmiany jakości. Połączenie obu modyfikacji nie przewyższa każdej z nich osobno. W regresji najlepszy okazał się Random Forest.
+Badamy bagging modeli Gradient Boosting (BaggedGBDT) z dwiema modyfikacjami: **Adaptive Sampling**, który losuje próbki dla kolejnych modeli z wagami zależnymi od błędu i rozbieżności predykcji out-of-bag dotychczasowego zespołu, oraz **Ensemble-Aware Early Stopping**, który dobiera liczbę drzew każdego modelu na podstawie straty całego zespołu na walidacji. Cztery warianty (Baseline, +1, +2, +1+2) porównujemy z GBDT, baggingiem drzew i Random Forest na 24 zbiorach UCI (12 klasyfikacyjnych, 12 regresyjnych), stosując 2×5-krotną walidację krzyżową ze strojeniem hiperparametrów w każdym foldzie. Adaptive Sampling istotnie poprawia Macro F1 w klasyfikacji (lepszy wynik na 11 z 12 zbiorów, p = 0,006 po korekcie Holma; najlepsza średnia ranga wśród 7 metod), ale nie poprawia jakości w regresji. Early Stopping zmniejsza liczbę budowanych drzew o ok. 18% i czas treningu o ok. 10% bez istotnej zmiany jakości. Połączenie obu modyfikacji nie przewyższa każdej z nich osobno. W regresji najlepszy okazał się Random Forest. W eksperymencie dodatkowym z 10% i 20% szumu w etykietach oraz ablacją Adaptive Sampling pokazujemy, że zysk w klasyfikacji pochodzi z sygnału błędu e_i, ale ten sam sygnał przy zaszumionych etykietach wzmacnia szum: w regresji pogarsza wynik na 11 z 12 zbiorów (p ≤ 0,004 po korekcie Holma). Wariant oparty wyłącznie na rozbieżności d_i jest odporny na szum i przy obu poziomach szumu jest lepszy od wariantu opartego na błędzie na wszystkich 12 zbiorach regresyjnych.
+
+## Spis treści
+
+1. Problem badawczy
+2. Podstawy teoretyczne i przegląd literatury
+3. Proponowana metoda
+4. Eksperymenty (zbiory danych, walidacja, strojenie, metryki, pilotaż)
+5. Wyniki (jakość, stabilność, koszt, szum w etykietach i ablacja)
+6. Dyskusja
+7. Wnioski
+8. Zmiany względem planu
+9. Wykorzystanie narzędzi AI
+10. Uruchomienie kodu i odtworzenie wyników
+
+Literatura
 
 ## 1. Problem badawczy
 
@@ -21,7 +36,19 @@ Porównujemy cztery warianty: Baseline (bagging GBDT), Baseline+1, Baseline+2 i 
 - **H2** – Ensemble-Aware Early Stopping zmniejsza koszt obliczeniowy bez istotnego pogorszenia jakości.
 - **H3** – połączenie obu modyfikacji daje lepszy kompromis jakość–stabilność–koszt niż każda z nich osobno.
 
-## 2. Przegląd literatury
+## 2. Podstawy teoretyczne i przegląd literatury
+
+### 2.1. Podstawy teoretyczne
+
+**Zespoły modeli.** Błąd oczekiwany modelu można rozłożyć na obciążenie (systematyczne odchylenie od prawdziwej zależności), wariancję (wrażliwość na konkretną próbkę uczącą) i szum nieredukowalny. Zespół łączy predykcje wielu modeli; zyskuje tym więcej, im bardziej modele są trafne i jednocześnie różnorodne, tzn. mylą się na różnych obserwacjach.
+
+**Bagging** (bootstrap aggregating) trenuje modele na próbkach bootstrapowych – n obserwacji losowanych ze zwracaniem – i uśrednia ich predykcje. Każda próbka pomija średnio ok. 36,8% obserwacji; są to obserwacje **out-of-bag (OOB)** danego modelu, które pozwalają ocenić model bez osobnego zbioru. Uśrednianie zmniejsza przede wszystkim wariancję, dlatego bagging działa najlepiej z modelami niestabilnymi, np. głębokimi drzewami. **Random Forest** dodatkowo losuje podzbiór cech w każdym podziale drzewa, co zwiększa różnorodność.
+
+**Boosting** buduje modele sekwencyjnie, a każdy kolejny koncentruje się na błędach poprzednich, co zmniejsza głównie obciążenie. **Gradient Boosting (GBDT)** w każdej iteracji dopasowuje płytkie drzewo regresyjne do ujemnego gradientu funkcji straty (w regresji kwadratowej – do reszt) i dodaje je do modelu z mnożnikiem learning_rate. Liczba iteracji M kontroluje dopasowanie: zbyt duża prowadzi do przeuczenia, stąd zatrzymywanie na walidacji (early stopping).
+
+**Bagging modeli boostingowych** łączy oba mechanizmy: każdy GBDT ma niskie obciążenie, a uśrednianie wielu takich modeli zmniejsza wariancję. Kosztem jest B-krotnie dłuższy trening. Nasze modyfikacje dotyczą dwóch elementów tego schematu: sposobu losowania próbek (zamiast jednostajnego – zależnie od trudności obserwacji dla dotychczasowego zespołu) i liczby iteracji każdego modelu (zamiast stałej – zależnie od wkładu modelu w jakość całego zespołu).
+
+### 2.2. Przegląd literatury
 
 - **MultiBoosting** (Webb, 2000) [1] łączy boosting z waggingiem (wariantem baggingu z losowymi wagami) – punkt odniesienia dla naszego wariantu bazowego.
 - **Vote-Boosting** (Sabzevari i in., 2018) [2] uzależnia wagi przykładów od stopnia zgodności głosów zespołu. Nasz Adaptive Sampling korzysta z podobnej idei rozbieżności, ale łączy ją z błędem zespołu i steruje losowaniem próbek bootstrapowych dla kolejnych modeli GBDT.
@@ -61,7 +88,7 @@ Kod napisaliśmy w Pythonie z użyciem biblioteki scikit-learn (klasy `GradientB
 - `src/data.py` – pobieranie 24 zbiorów z UCI i przygotowanie danych,
 - `src/evaluation.py`, `src/tuning.py` – walidacja krzyżowa, strojenie i metryki,
 - `scripts/run_full.py`, `scripts/analyze.py`, `scripts/figures.py` – eksperymenty, analiza statystyczna i rysunki,
-- `tests/` – 12 testów poprawności (m.in. przycinanie modelu, wybór checkpointu, rozłączność podziałów, brak wycieku przy uzupełnianiu braków).
+- `tests/` – 14 testów poprawności (m.in. przycinanie modelu, wybór checkpointu, rozłączność podziałów, brak wycieku przy uzupełnianiu braków, szum w etykietach).
 
 ## 4. Eksperymenty
 
@@ -127,51 +154,65 @@ Klasyfikację i regresję analizujemy osobno. Jednostką testów statystycznych 
 
 Eksperymenty uruchomiliśmy równolegle w 8 procesach (po jednym wątku). Czasy są przez to nieco zawyżone, ale w równym stopniu dla wszystkich metod, więc porównania względne pozostają miarodajne.
 
+### 4.5. Pilotaż
+
+Przed pełnymi eksperymentami przeprowadziliśmy pilotaż na 6 zbiorach (klasyfikacja: Wine, Breast Cancer, Banknote; regresja: Yacht, Auto MPG, Concrete), 7 metodach i tych samych 10 foldach, ze stałymi hiperparametrami (B = 10, M = 200, max_depth = 3, learning_rate = 0,1, α = β = 1, k = 20, p = 2; Bagging i RF – 100 drzew), łącznie 420 przebiegów. Pilotaż służył sprawdzeniu poprawności implementacji i oszacowaniu czasu obliczeń; jego wyniki nie wchodzą do analizy statystycznej. Na jego podstawie wprowadziliśmy trzy zmiany:
+
+- **kryterium stopu Early Stopping**: Macro F1 na małej walidacji zmieniało się skokowo i powodowało zbyt wczesne zatrzymanie, więc przeszliśmy na log-loss (klasyfikacja) i MAE (regresja) – punkt 3.3,
+- **próg poprawy 0,1%**: bez niego Early Stopping w praktyce nigdy się nie zatrzymywał, bo strata zespołu spadała o wartości pomijalnie małe,
+- **przycinanie modelu zamiast kopiowania**: pierwotna implementacja zapamiętywała kopię modelu w każdym checkpoincie, co wydłużało trening o ok. 70% (na zbiorze Yacht); zastąpiliśmy ją przycięciem modelu do najlepszej liczby iteracji. Poprawność potwierdziliśmy, porównując wyniki obu implementacji na wszystkich 420 przebiegach pilotażu (identyczne metryki).
+
+W pilotażu (`results/pilot_summary.md`) najlepszą średnią rangę w obu zadaniach miał wariant z Adaptive Sampling (klasyfikacja: Baseline+1+2, regresja: Baseline+1). W pełnych eksperymentach – na 4 razy większej liczbie zbiorów i ze strojeniem – potwierdziło się to tylko w klasyfikacji.
+
 ## 5. Wyniki
 
 Wszystkie 1680 przebiegów (24 zbiory × 7 metod × 10 foldów, każdy ze strojeniem 8 konfiguracji) zakończyło się bez błędów; obliczenia trwały 3,6 h na 8 rdzeniach. Pełne tabele (z odchyleniami standardowymi, Accuracy i RMSE) są w `results/summary.md`, a surowe wyniki w `results/full.csv`.
 
 ### 5.1. Jakość predykcji
 
-**Tabela 3.** Klasyfikacja – Macro F1 (↑), średnia z 10 przebiegów; pogrubiona najlepsza metoda (dla Mushroom wszystkie metody osiągają 0,9996–1,0000)
+Tabela 3 pokazuje wyniki klasyfikacji, a tabela 4 – regresji, dla każdego zbioru i metody.
+
+**Tabela 3.** Klasyfikacja – Macro F1 (↑), średnia ± odchylenie standardowe z 10 przebiegów; pogrubiona najlepsza metoda
 
 | Zbiór | GBDT | Bagging | RF | Baseline | Baseline+1 | Baseline+2 | Baseline+1+2 |
 |---|---|---|---|---|---|---|---|
-| banknote | **0.994** | 0.989 | 0.992 | 0.992 | 0.994 | 0.992 | 0.994 |
-| breast_cancer | 0.954 | 0.950 | 0.951 | 0.951 | **0.956** | 0.948 | 0.950 |
-| car | **0.954** | 0.928 | 0.935 | 0.937 | 0.945 | 0.937 | 0.947 |
-| dry_bean | 0.937 | 0.936 | 0.935 | 0.937 | **0.938** | 0.937 | 0.938 |
-| german_credit | 0.663 | **0.671** | 0.666 | 0.662 | 0.669 | 0.649 | 0.666 |
-| glass | 0.600 | 0.676 | **0.692** | 0.588 | 0.618 | 0.579 | 0.587 |
-| ionosphere | **0.927** | 0.922 | 0.921 | 0.919 | 0.926 | 0.920 | 0.923 |
-| mushroom | 1.000 | 1.000 | **1.000** | 1.000 | 1.000 | 1.000 | 1.000 |
-| rice | 0.922 | 0.923 | 0.921 | 0.926 | 0.925 | **0.926** | 0.925 |
-| sonar | 0.808 | 0.773 | 0.791 | 0.790 | 0.800 | 0.792 | **0.820** |
-| spambase | 0.946 | 0.937 | **0.949** | 0.944 | 0.948 | 0.943 | 0.948 |
-| wine | 0.944 | 0.950 | 0.973 | 0.970 | 0.971 | **0.973** | 0.965 |
+| banknote | **0.994**<br><small>± 0.008</small> | 0.989<br><small>± 0.004</small> | 0.992<br><small>± 0.006</small> | 0.992<br><small>± 0.007</small> | 0.994<br><small>± 0.007</small> | 0.992<br><small>± 0.007</small> | 0.994<br><small>± 0.007</small> |
+| breast_cancer | 0.954<br><small>± 0.023</small> | 0.950<br><small>± 0.019</small> | 0.951<br><small>± 0.016</small> | 0.951<br><small>± 0.025</small> | **0.956**<br><small>± 0.018</small> | 0.948<br><small>± 0.023</small> | 0.950<br><small>± 0.023</small> |
+| car | **0.954**<br><small>± 0.019</small> | 0.928<br><small>± 0.031</small> | 0.935<br><small>± 0.019</small> | 0.937<br><small>± 0.018</small> | 0.945<br><small>± 0.017</small> | 0.937<br><small>± 0.018</small> | 0.947<br><small>± 0.016</small> |
+| dry_bean | 0.937<br><small>± 0.004</small> | 0.936<br><small>± 0.003</small> | 0.935<br><small>± 0.004</small> | 0.937<br><small>± 0.004</small> | **0.938**<br><small>± 0.003</small> | 0.937<br><small>± 0.003</small> | 0.938<br><small>± 0.003</small> |
+| german_credit | 0.663<br><small>± 0.023</small> | **0.671**<br><small>± 0.030</small> | 0.666<br><small>± 0.012</small> | 0.662<br><small>± 0.022</small> | 0.669<br><small>± 0.021</small> | 0.649<br><small>± 0.029</small> | 0.666<br><small>± 0.020</small> |
+| glass | 0.600<br><small>± 0.090</small> | 0.676<br><small>± 0.121</small> | **0.692**<br><small>± 0.102</small> | 0.588<br><small>± 0.125</small> | 0.618<br><small>± 0.110</small> | 0.579<br><small>± 0.101</small> | 0.587<br><small>± 0.135</small> |
+| ionosphere | **0.927**<br><small>± 0.039</small> | 0.922<br><small>± 0.037</small> | 0.921<br><small>± 0.041</small> | 0.919<br><small>± 0.029</small> | 0.926<br><small>± 0.029</small> | 0.920<br><small>± 0.031</small> | 0.923<br><small>± 0.032</small> |
+| mushroom | 0.9997<br><small>± 0.0005</small> | 0.9998<br><small>± 0.0004</small> | **1.0000**<br><small>± 0.0000</small> | 0.9996<br><small>± 0.0005</small> | 0.9998<br><small>± 0.0004</small> | 0.9996<br><small>± 0.0005</small> | 0.9998<br><small>± 0.0004</small> |
+| rice | 0.922<br><small>± 0.009</small> | 0.923<br><small>± 0.008</small> | 0.921<br><small>± 0.008</small> | 0.926<br><small>± 0.009</small> | 0.925<br><small>± 0.008</small> | **0.926**<br><small>± 0.009</small> | 0.925<br><small>± 0.007</small> |
+| sonar | 0.808<br><small>± 0.043</small> | 0.773<br><small>± 0.075</small> | 0.791<br><small>± 0.046</small> | 0.790<br><small>± 0.054</small> | 0.800<br><small>± 0.057</small> | 0.792<br><small>± 0.044</small> | **0.820**<br><small>± 0.060</small> |
+| spambase | 0.946<br><small>± 0.006</small> | 0.937<br><small>± 0.007</small> | **0.949**<br><small>± 0.007</small> | 0.944<br><small>± 0.007</small> | 0.948<br><small>± 0.005</small> | 0.943<br><small>± 0.008</small> | 0.948<br><small>± 0.006</small> |
+| wine | 0.944<br><small>± 0.062</small> | 0.950<br><small>± 0.034</small> | 0.973<br><small>± 0.033</small> | 0.970<br><small>± 0.027</small> | 0.971<br><small>± 0.026</small> | **0.973**<br><small>± 0.025</small> | 0.965<br><small>± 0.032</small> |
 
-**Tabela 4.** Regresja – MAE (↓) w jednostkach celu, średnia z 10 przebiegów; pogrubiona najlepsza metoda
+**Tabela 4.** Regresja – MAE (↓) w jednostkach celu, średnia ± odchylenie standardowe z 10 przebiegów; pogrubiona najlepsza metoda
 
 | Zbiór | GBDT | Bagging | RF | Baseline | Baseline+1 | Baseline+2 | Baseline+1+2 |
 |---|---|---|---|---|---|---|---|
-| abalone | 1.536 | **1.504** | 1.519 | 1.513 | 1.528 | 1.524 | 1.544 |
-| airfoil | 1.746 | **1.424** | 1.424 | 1.824 | 1.817 | 1.825 | 1.822 |
-| auto_mpg | 2.061 | **1.998** | 2.015 | 2.038 | 2.034 | 2.041 | 2.035 |
-| ccpp | 2.813 | 2.455 | **2.367** | 2.878 | 2.870 | 2.880 | 2.871 |
-| computer_hardware | 28.92 | 29.48 | **27.19** | 28.06 | 28.12 | 28.49 | 28.48 |
-| concrete | **3.403** | 3.717 | 3.714 | 3.636 | 3.606 | 3.649 | 3.603 |
-| energy | **0.310** | 0.342 | 0.342 | 0.325 | 0.321 | 0.330 | 0.325 |
-| forest_fires | 20.80 | 21.43 | 20.09 | 20.45 | 21.27 | **18.73** | 20.19 |
-| real_estate | 4.885 | 4.838 | **4.750** | 4.791 | 4.940 | 4.843 | 4.895 |
-| student_por | 2.031 | 1.967 | **1.940** | 2.011 | 2.025 | 2.000 | 2.008 |
-| wine_quality_white | 0.529 | 0.452 | **0.446** | 0.531 | 0.531 | 0.534 | 0.535 |
-| yacht | **0.357** | 0.556 | 0.539 | 0.406 | 0.386 | 0.414 | 0.396 |
+| abalone | 1.536<br><small>± 0.047</small> | **1.504**<br><small>± 0.052</small> | 1.519<br><small>± 0.053</small> | 1.513<br><small>± 0.053</small> | 1.528<br><small>± 0.051</small> | 1.524<br><small>± 0.055</small> | 1.544<br><small>± 0.049</small> |
+| airfoil | 1.746<br><small>± 0.098</small> | **1.424**<br><small>± 0.073</small> | 1.424<br><small>± 0.072</small> | 1.824<br><small>± 0.169</small> | 1.817<br><small>± 0.162</small> | 1.825<br><small>± 0.169</small> | 1.822<br><small>± 0.164</small> |
+| auto_mpg | 2.061<br><small>± 0.242</small> | **1.998**<br><small>± 0.222</small> | 2.015<br><small>± 0.232</small> | 2.038<br><small>± 0.200</small> | 2.034<br><small>± 0.205</small> | 2.041<br><small>± 0.198</small> | 2.035<br><small>± 0.233</small> |
+| ccpp | 2.813<br><small>± 0.043</small> | 2.455<br><small>± 0.045</small> | **2.367**<br><small>± 0.049</small> | 2.878<br><small>± 0.084</small> | 2.870<br><small>± 0.082</small> | 2.880<br><small>± 0.084</small> | 2.871<br><small>± 0.082</small> |
+| computer_hardware | 28.92<br><small>± 5.35</small> | 29.48<br><small>± 7.98</small> | **27.19**<br><small>± 6.31</small> | 28.06<br><small>± 7.03</small> | 28.12<br><small>± 6.21</small> | 28.49<br><small>± 7.38</small> | 28.48<br><small>± 6.96</small> |
+| concrete | **3.403**<br><small>± 0.278</small> | 3.717<br><small>± 0.294</small> | 3.714<br><small>± 0.292</small> | 3.636<br><small>± 0.329</small> | 3.606<br><small>± 0.293</small> | 3.649<br><small>± 0.330</small> | 3.603<br><small>± 0.277</small> |
+| energy | **0.310**<br><small>± 0.036</small> | 0.342<br><small>± 0.028</small> | 0.342<br><small>± 0.029</small> | 0.325<br><small>± 0.046</small> | 0.321<br><small>± 0.041</small> | 0.330<br><small>± 0.047</small> | 0.325<br><small>± 0.043</small> |
+| forest_fires | 20.80<br><small>± 4.91</small> | 21.43<br><small>± 4.91</small> | 20.09<br><small>± 4.61</small> | 20.45<br><small>± 5.05</small> | 21.27<br><small>± 6.27</small> | **18.73**<br><small>± 4.84</small> | 20.19<br><small>± 5.67</small> |
+| real_estate | 4.885<br><small>± 0.655</small> | 4.838<br><small>± 0.718</small> | **4.750**<br><small>± 0.697</small> | 4.791<br><small>± 0.690</small> | 4.940<br><small>± 0.650</small> | 4.843<br><small>± 0.677</small> | 4.895<br><small>± 0.590</small> |
+| student_por | 2.031<br><small>± 0.158</small> | 1.967<br><small>± 0.136</small> | **1.940**<br><small>± 0.166</small> | 2.011<br><small>± 0.151</small> | 2.025<br><small>± 0.133</small> | 2.000<br><small>± 0.149</small> | 2.008<br><small>± 0.144</small> |
+| wine_quality_white | 0.529<br><small>± 0.015</small> | 0.452<br><small>± 0.019</small> | **0.446**<br><small>± 0.017</small> | 0.531<br><small>± 0.014</small> | 0.531<br><small>± 0.016</small> | 0.534<br><small>± 0.014</small> | 0.535<br><small>± 0.015</small> |
+| yacht | **0.357**<br><small>± 0.075</small> | 0.556<br><small>± 0.125</small> | 0.539<br><small>± 0.126</small> | 0.406<br><small>± 0.099</small> | 0.386<br><small>± 0.072</small> | 0.414<br><small>± 0.109</small> | 0.396<br><small>± 0.073</small> |
 
 Średnie rangi pokazuje rysunek 1. W **klasyfikacji** najlepszą średnią rangę ma Baseline+1 (2,50), przed Baseline+1+2 (3,33), GBDT (3,58) i RF (3,83); Baseline zajmuje dopiero piąte miejsce (4,83). Test Friedmana wykrywa istotne różnice (χ² = 14,05, p = 0,029). W **regresji** najlepszy jest RF (2,75), a cztery warianty BaggedGBDT mają rangi 4,08–4,83; test Friedmana nie wykrywa istotnych różnic (χ² = 6,36, p = 0,38).
 
 ![Średnie rangi metod](../results/figures/fig_ranks.png)
 
 *Rysunek 1. Średnie rangi metod (1 = najlepsza); regresja na MAE znormalizowanym przez std(y).*
+
+Wyniki testów Wilcoxona dla par porównań z planu zestawia tabela 5.
 
 **Tabela 5.** Testy Wilcoxona dla par z planu (12 zbiorów w każdym zadaniu; „lepsze / gorsze” – na ilu zbiorach druga metoda pary wypada lepiej / gorzej od pierwszej; p po korekcie Holma)
 
@@ -185,6 +226,8 @@ Wszystkie 1680 przebiegów (24 zbiory × 7 metod × 10 foldów, każdy ze stroje
 | Baseline+2 → Baseline+1+2 | 10 / 2 | 0,17 | 7 / 5 | 1,00 |
 
 Jedyną istotną różnicą po korekcie jest przewaga **Baseline+1 nad Baseline w klasyfikacji**: lepszy wynik na 11 z 12 zbiorów, średnio +0,9% Macro F1 (największe zyski: Glass +5,1%, Sonar +1,3%, Car +0,8%). Przed korektą istotna (p = 0,034) jest też przewaga Baseline+1+2 nad Baseline+2 w klasyfikacji – to ten sam efekt Adaptive Sampling, widoczny na wariantach z Early Stopping.
+
+Poza parami z planu sprawdziliśmy też porównanie najlepszego wariantu z najmocniejszą referencją. Baseline+1 jest lepszy od GBDT na 8 z 12 zbiorów klasyfikacyjnych, ale różnica nie jest istotna (test Wilcoxona, p = 0,23 bez korekty). W regresji RF jest lepszy od Baseline+1 na 9 z 12 zbiorów (p = 0,034 bez korekty). To porównanie ma charakter eksploracyjny – nie było przewidziane w planie.
 
 ### 5.2. Stabilność
 
@@ -206,6 +249,8 @@ Stabilność mierzymy odchyleniem standardowym metryki głównej z 10 przebiegó
 
 Średnie z tabeli 6 są zdominowane przez największe zbiory (w klasyfikacji Dry Bean), dlatego zmiany względne podajemy jako średnią geometryczną ilorazów po zbiorach. Ensemble-Aware Early Stopping zatrzymał trening przed limitem M w 68–78% foldów; modele końcowe wykorzystują średnio 71–78% limitu iteracji. Liczba faktycznie zbudowanych drzew (łącznie z drzewami za najlepszym checkpointem) spada do 82% Baseline w klasyfikacji i 81% w regresji, a czas treningu do ok. 90%. Czas maleje mniej niż liczba drzew, bo każdy checkpoint wymaga predykcji na walidacji, a drzewa zbudowane w okresie cierpliwości p są potem odrzucane. Oszczędność silnie zależy od zbioru (rysunek 3): od 52% drzew na Forest Fires i ok. 40% na German Credit i Rice do zera na zbiorach, na których zespół poprawia się aż do limitu M (CCPP, Car, Banknote, Airfoil). Adaptive Sampling wydłuża trening o ok. 5% w klasyfikacji (liczenie predykcji OOB); w regresji narzut jest niezauważalny.
 
+Rysunek 2 zestawia jakość (średnią rangę) z czasem treningu: warianty BaggedGBDT leżą w prawej części wykresu (najdroższe), a w klasyfikacji Baseline+1 i Baseline+1+2 są jednocześnie najwyżej.
+
 ![Jakość vs koszt](../results/figures/fig_tradeoff.png)
 
 *Rysunek 2. Średnia ranga a czas treningu względem Baseline (średnia geometryczna po zbiorach).*
@@ -216,15 +261,69 @@ Stabilność mierzymy odchyleniem standardowym metryki głównej z 10 przebiegó
 
 Warianty BaggedGBDT są ok. 6–10 razy droższe od pojedynczego GBDT i od RF, bo trenują B = 5–10 pełnych modeli GBDT. Strojenie najczęściej wybierało M = 200 (62%), max_depth = 3 (65–68%) i learning_rate = 0,1 (73–78%), czyli górne wartości przestrzeni; B = 5 i B = 10 wybierano mniej więcej po równo.
 
+### 5.4. Eksperyment dodatkowy: szum w etykietach i ablacja Adaptive Sampling
+
+Adaptive Sampling, podobnie jak boosting, częściej losuje obserwacje, na których zespół się myli. Boosting jest znany z wrażliwości na błędne etykiety [5], dlatego sprawdziliśmy, jak modyfikacje zachowują się przy zaszumionych danych i który z dwóch sygnałów wag – błąd e_i czy rozbieżność d_i – odpowiada za wynik. Eksperyment wykracza poza plan projektu.
+
+**Procedura.** Te same podziały 2×5 CV, strojenie i metody co w punktach 4.2–4.4, z dwoma zmianami:
+
+- **szum w etykietach** 10% i 20% w części treningowej i walidacyjnej foldu (fold testowy pozostaje czysty, więc mierzymy jakość względem prawdziwych etykiet). W klasyfikacji wybrana obserwacja dostaje losową inną klasę, w regresji – wartość celu losowej obserwacji z części treningowej. Szum jest identyczny dla wszystkich metod w danym foldzie,
+- **ablacja Adaptive Sampling**: Baseline+1(e) używa tylko błędu (β = 0), a Baseline+1(d) tylko rozbieżności (α = 0); oba warianty bez Early Stopping i z tym samym losowaniem konfiguracji co Baseline+1.
+
+Pominęliśmy zbiór Dry Bean, który odpowiadał za ok. 70% czasu obliczeń pełnych eksperymentów, więc analiza obejmuje 11 zbiorów klasyfikacyjnych i 12 regresyjnych (wyniki dla szumu 0% pochodzą z eksperymentów głównych). Łącznie 4600 nowych przebiegów (2,7 h na 8 rdzeniach), 0 błędów.
+
+Tabela 7 i rysunek 4 pokazują średnią względną różnicę każdej metody względem Baseline, a tabela 8 najważniejsze testy Wilcoxona.
+
+**Tabela 7.** Względna różnica metryki względem Baseline [%], średnia po zbiorach (+ = lepiej; klasyfikacja – Macro F1, regresja – MAE / std(y))
+
+| Metoda | Klas. 0% | Klas. 10% | Klas. 20% | Regr. 0% | Regr. 10% | Regr. 20% |
+|---|---|---|---|---|---|---|
+| GBDT | +0,44 | −0,85 | −2,08 | +1,72 | −1,52 | −0,42 |
+| Bagging | +0,91 | +0,53 | +3,06 | +0,18 | +1,54 | +0,83 |
+| RF | **+1,69** | **+1,29** | **+3,69** | **+2,16** | **+0,86** | **+1,79** |
+| Baseline+1 | +0,94 | −0,07 | −0,75 | +0,07 | −3,84 | −3,59 |
+| Baseline+2 | −0,27 | −1,93 | −2,10 | −0,07 | −0,11 | −0,85 |
+| Baseline+1+2 | +0,50 | −1,07 | −0,57 | −0,05 | −3,45 | −3,80 |
+| Baseline+1(e) – tylko błąd | +0,92 | −0,07 | −0,23 | +0,28 | −5,24 | −3,62 |
+| Baseline+1(d) – tylko rozbieżność | +0,18 | +0,20 | +0,75 | +0,09 | +0,33 | +1,15 |
+
+![Wpływ szumu w etykietach](../results/figures/fig_noise.png)
+
+*Rysunek 4. Względna różnica metryki względem Baseline przy rosnącym szumie w etykietach (+ = lepiej).*
+
+**Tabela 8.** Wybrane testy Wilcoxona przy różnym poziomie szumu: „lepsze / gorsze” – na ilu zbiorach druga metoda pary wypada lepiej / gorzej od pierwszej; w nawiasie p po korekcie Holma (osobno dla par głównych i par ablacji, w każdym zadaniu i poziomie szumu)
+
+| Porównanie | Klas. 0% | Klas. 10% | Klas. 20% | Regr. 0% | Regr. 10% | Regr. 20% |
+|---|---|---|---|---|---|---|
+| Baseline → Baseline+1 | **10 / 1**<br>**(0,016)** | 6 / 5<br>(1,00) | 4 / 7<br>(1,00) | 7 / 5<br>(1,00) | **1 / 11**<br>**(0,009)** | **1 / 11**<br>**(0,010)** |
+| Baseline → Baseline+1+2 | 7 / 4<br>(1,00) | 5 / 6<br>(1,00) | 6 / 5<br>(1,00) | 8 / 4<br>(1,00) | **0 / 12**<br>**(0,004)** | **1 / 11**<br>**(0,010)** |
+| Baseline+1 → Baseline+1+2 | 3 / 6<br>(1,00) | 3 / 8<br>(1,00) | 6 / 5<br>(1,00) | 4 / 8<br>(1,00) | 5 / 7<br>(0,97) | 4 / 8<br>(0,38) |
+| GBDT → Baseline+1 | 7 / 4<br>(1,00) | 9 / 2<br>(0,74) | 9 / 2<br>(0,23) | 4 / 8<br>(1,00) | 4 / 8<br>(0,45) | 5 / 7<br>(0,26) |
+| Baseline → Baseline+1(e) | 9 / 2<br>(0,16) | 4 / 7<br>(1,00) | 5 / 6<br>(1,00) | 5 / 7<br>(0,46) | **1 / 11**<br>**(0,004)** | **1 / 11**<br>**(0,003)** |
+| Baseline → Baseline+1(d) | 7 / 4<br>(1,00) | 6 / 5<br>(1,00) | 7 / 4<br>(0,59) | 5 / 7<br>(1,00) | 6 / 6<br>(0,79) | 7 / 5<br>(0,76) |
+| Baseline+1(e) → Baseline+1(d) | 2 / 9<br>(0,17) | 8 / 3<br>(1,00) | 7 / 4<br>(0,59) | 7 / 5<br>(1,00) | **12 / 0**<br>**(0,002)** | **12 / 0**<br>**(0,002)** |
+
+Pogrubione są różnice istotne po korekcie (p < 0,05). Bez szumu Baseline+1 jest lepszy od Baseline na 10 z 11 zbiorów klasyfikacyjnych – wynik z punktu 5.1 utrzymuje się po usunięciu Dry Bean.
+
+**Szum odwraca efekt Adaptive Sampling w regresji.** Bez szumu Adaptive Sampling w regresji nic nie zmienia, ale przy 10% i 20% szumu Baseline+1 jest gorszy od Baseline na 11 z 12 zbiorów (średnio o 3,6–3,8%), a Baseline+1+2 na 11–12 z 12. Ablacja wskazuje przyczynę: ten sam spadek daje wariant oparty tylko na błędzie (1 / 11 zbiorów, p ≤ 0,004), natomiast wariant oparty tylko na rozbieżności nie traci nic względem Baseline (średnio +0,3% i +1,2%) i przy obu poziomach szumu jest lepszy od wariantu z błędem na **wszystkich 12 zbiorach** (p = 0,002). Obserwacja z zaszumionym celem ma duży błąd OOB, więc wagi w_i = 1 + α·e_i + β·d_i kierują na nią kolejne modele i zespół uczy się szumu. Rozbieżność d_i nie zależy bezpośrednio od etykiety, tylko od niezgody modeli, dlatego szumu nie wzmacnia.
+
+**W klasyfikacji szum znosi zysk Adaptive Sampling.** Bez szumu zysk pochodzi głównie z błędu (Baseline+1(e) jest lepszy od Baseline+1(d) na 9 z 11 zbiorów, p = 0,042 bez korekty). Przy 10–20% szumu kolejność się odwraca: wariant z rozbieżnością jest najlepszym wariantem BaggedGBDT (+0,75% F1 przy 20% szumu), a Baseline+1 traci przewagę nad Baseline. Te różnice nie są jednak istotne. Efekt jest słabszy niż w regresji, bo w klasyfikacji błąd e_i jest ograniczony (prawdopodobieństwo poprawnej klasy z przedziału [0, 1]), a w regresji wartość podmieniona na losową może dać błąd wielokrotnie większy od typowego.
+
+**Early Stopping przy szumie.** Oszczędność Early Stopping rośnie z poziomem szumu w klasyfikacji: Baseline+2 buduje 81% drzew Baseline bez szumu, 61% przy 10% i 59% przy 20% (w regresji odpowiednio 81%, 81%, 77%), bo strata zespołu na zaszumionej walidacji szybciej przestaje spadać. Nie potwierdziła się natomiast hipoteza, że Early Stopping powstrzyma Adaptive Sampling przed uczeniem się szumu: Baseline+1+2 nie jest istotnie lepszy od Baseline+1 przy żadnym poziomie szumu (tabela 8). Wynika to stąd, że kryterium stopu liczy się na walidacji z tym samym szumem, więc nie rozpoznaje dopasowania do błędnych etykiet.
+
+**Odporność metod referencyjnych.** Zgodnie z literaturą [5] metody oparte na baggingu są najbardziej odporne: przy 20% szumu Macro F1 spada średnio o 5,2% (Bagging) i 5,4% (RF), w Baseline o 6,9%, a w pojedynczym GBDT o 9,1%. W regresji MAE znormalizowane rośnie ok. 2,1–2,4 razy we wszystkich metodach, najmniej w baggingu drzew i RF. Bagging GBDT jest więc odporniejszy od pojedynczego GBDT – przy 20% szumu Baseline+1 jest od niego lepszy na 9 z 11 zbiorów klasyfikacyjnych (różnica nieistotna po korekcie). Najlepszą metodą przy szumie pozostaje jednak RF.
+
 ## 6. Dyskusja
 
-**H1 (Adaptive Sampling poprawia jakość i stabilność) – potwierdzona w klasyfikacji, niepotwierdzona w regresji.** W klasyfikacji Baseline+1 jest lepszy od Baseline na 11 z 12 zbiorów; to jedyna różnica istotna po korekcie Holma, a Baseline+1 ma najlepszą średnią rangę spośród wszystkich metod. Zysk jest największy na małych, trudnych zbiorach (Glass, Sonar), gdzie częstsze losowanie trudnych i spornych obserwacji daje kolejnym modelom więcej informacji o granicy decyzyjnej. W regresji efekt jakościowy jest zerowy (7 / 5 zbiorów, średnio +0,1%). Prawdopodobna przyczyna: błąd e_i w regresji jest zdominowany przez obserwacje z dużym szumem w celu (Forest Fires, Real Estate), więc częstsze ich losowanie wzmacnia szum zamiast poprawiać model. Stabilność poprawia się w obu zadaniach (mniejsze odchylenie na 9/12 i 10/12 zbiorów), choć tego efektu nie testowaliśmy formalnie.
+**H1 (Adaptive Sampling poprawia jakość i stabilność) – potwierdzona w klasyfikacji, niepotwierdzona w regresji.** W klasyfikacji Baseline+1 jest lepszy od Baseline na 11 z 12 zbiorów; to jedyna różnica istotna po korekcie Holma, a Baseline+1 ma najlepszą średnią rangę spośród wszystkich metod. Zysk jest największy na małych, trudnych zbiorach (Glass, Sonar), gdzie częstsze losowanie trudnych i spornych obserwacji daje kolejnym modelom więcej informacji o granicy decyzyjnej. W regresji efekt jakościowy jest zerowy (7 / 5 zbiorów, średnio +0,1%). Prawdopodobna przyczyna: błąd e_i w regresji jest zdominowany przez obserwacje z dużym szumem w celu (Forest Fires, Real Estate), więc częstsze ich losowanie wzmacnia szum zamiast poprawiać model. Eksperyment z punktu 5.4 potwierdza ten mechanizm: przy sztucznym szumie w etykietach wariant oparty na błędzie istotnie pogarsza wynik, a wariant oparty tylko na rozbieżności nie. Stabilność poprawia się w obu zadaniach (mniejsze odchylenie na 9/12 i 10/12 zbiorów), choć tego efektu nie testowaliśmy formalnie.
 
 **H2 (Early Stopping zmniejsza koszt bez istotnego pogorszenia jakości) – potwierdzona, z zastrzeżeniem.** Liczba drzew spada o ok. 18%, a czas treningu o ok. 10%; żadna różnica jakości względem Baseline nie jest istotna (klasyfikacja: średnio −0,25% F1, regresja: −0,07% MAE). W regresji Baseline+2 jest jednak gorszy na 10 z 12 zbiorów, choć różnice są bardzo małe (mediana 0,0006 w MAE znormalizowanym), a w klasyfikacji spadek na German Credit sięga 2% F1. Wskazuje to na lekką tendencję do zbyt wczesnego zatrzymania. Oszczędność ogranicza też limit M ≤ 200 z planu: na wielu zbiorach zespół poprawia się aż do limitu i Early Stopping nie ma czego ucinać. Przy większym M (np. 500) oszczędność byłaby większa.
 
-**H3 (połączenie daje najlepszy kompromis) – niepotwierdzona.** Baseline+1+2 nie jest istotnie lepszy ani od Baseline+1, ani od Baseline, a w klasyfikacji ma gorszą rangę niż sam Baseline+1 (3,33 wobec 2,50). Połączenie zachowuje część zysku z Adaptive Sampling (jest lepsze od Baseline+2 na 10 z 12 zbiorów) i część oszczędności z Early Stopping (89% drzew Baseline w klasyfikacji, 78% w regresji). Daje więc kompromis pośredni, ale nie dominuje żadnej z modyfikacji osobno. Modyfikacje częściowo działają przeciw sobie: Adaptive Sampling kieruje kolejne modele na trudne obserwacje, a Early Stopping ucina model, gdy strata zespołu na walidacji przestaje wyraźnie spadać – co może przerwać naukę właśnie tych trudnych przypadków.
+**H3 (połączenie daje najlepszy kompromis) – niepotwierdzona.** Baseline+1+2 nie jest istotnie lepszy ani od Baseline+1, ani od Baseline, a w klasyfikacji ma gorszą rangę niż sam Baseline+1 (3,33 wobec 2,50). Połączenie zachowuje część zysku z Adaptive Sampling (jest lepsze od Baseline+2 na 10 z 12 zbiorów) i część oszczędności z Early Stopping (89% drzew Baseline w klasyfikacji, 78% w regresji). Daje więc kompromis pośredni, ale nie dominuje żadnej z modyfikacji osobno. Modyfikacje częściowo działają przeciw sobie: Adaptive Sampling kieruje kolejne modele na trudne obserwacje, a Early Stopping ucina model, gdy strata zespołu na walidacji przestaje wyraźnie spadać – co może przerwać naukę właśnie tych trudnych przypadków. Przy szumie w etykietach (punkt 5.4) połączenie także nie pomaga: Early Stopping na zaszumionej walidacji nie odróżnia uczenia się szumu od poprawy modelu.
 
 **Porównanie z metodami referencyjnymi.** Sam bagging GBDT (Baseline) nie jest lepszy od pojedynczego strojonego GBDT (3 / 9 zbiorów w klasyfikacji, 6 / 6 w regresji), a kosztuje ok. 7 razy więcej. Przewagę nad GBDT w klasyfikacji daje dopiero Adaptive Sampling. W regresji wyraźnie wygrywają RF i bagging drzew, zwłaszcza na zbiorach z wieloma obserwacjami i niewieloma cechami (CCPP, Airfoil, Wine Quality – błąd niższy o 13–18% niż w Baseline). Głębokie drzewa RF lepiej modelują tam lokalne zależności niż płytkie drzewa (max_depth ≤ 3) w GBDT ograniczonym do 200 iteracji. Na zbiorach o gładkiej zależności (Yacht, Energy, Concrete) wygrywa natomiast GBDT, a warianty BaggedGBDT są tuż za nim.
+
+**Dwa sygnały Adaptive Sampling pełnią różne role.** Ablacja (punkt 5.4) pokazuje, że błąd e_i daje zysk na czystych danych klasyfikacyjnych, ale przy błędnych etykietach wzmacnia szum, a rozbieżność d_i daje mniejszy zysk, za to jest odporna na szum. Strojenie miało do dyspozycji pary (α, β) z przewagą rozbieżności, ale nie potrafiło ich wybrać, bo walidacja wewnętrzna jest zaszumiona tak samo jak dane treningowe. Wskazuje to kierunek dalszej pracy: wagi, które ograniczają wpływ błędu na obserwacjach podejrzanych o błędną etykietę (np. duży błąd przy małej rozbieżności), albo dobór proporcji α/β na podstawie oszacowanego poziomu szumu.
 
 **Ograniczenia.**
 
@@ -232,6 +331,7 @@ Warianty BaggedGBDT są ok. 6–10 razy droższe od pojedynczego GBDT i od RF, b
 - Przestrzenie strojenia są małe (8 konfiguracji), a wybierane wartości często leżą na górnej granicy (M = 200, max_depth = 3, learning_rate = 0,1), więc GBDT i warianty BaggedGBDT mogą być niedostrojone, szczególnie na dużych zbiorach regresyjnych.
 - Limit M ≤ 200 ogranicza możliwą oszczędność Early Stopping.
 - Czasy zmierzono przy 8 równoległych procesach, więc wartości bezwzględne są zawyżone; porównania względne pozostają miarodajne.
+- Szum w etykietach w punkcie 5.4 jest sztuczny i jednostajny (losowa klasa lub losowa wartość celu); szum rzeczywisty bywa zależny od cech i klasy, a jego wpływ może być inny.
 - Na małych zbiorach walidacja wewnętrzna jest bardzo mała (np. 29 obserwacji w Wine), co zwiększa wariancję wyboru konfiguracji i momentu zatrzymania.
 
 ## 7. Wnioski
@@ -240,8 +340,9 @@ Warianty BaggedGBDT są ok. 6–10 razy droższe od pojedynczego GBDT i od RF, b
 2. **Ensemble-Aware Early Stopping** zmniejsza liczbę budowanych drzew o ok. 18% i czas treningu o ok. 10% bez istotnego pogorszenia jakości. Oszczędność silnie zależy od zbioru (od 0% do 52%) i jest ograniczona limitem M ≤ 200.
 3. **Połączenie obu modyfikacji** daje kompromis pośredni, ale nie przewyższa samego Adaptive Sampling pod względem jakości ani samego Early Stopping pod względem kosztu.
 4. Sam bagging GBDT nie poprawia jakości względem pojedynczego GBDT, a kosztuje kilka razy więcej. W regresji najlepszy jest Random Forest.
+5. **Przy szumie w etykietach** (eksperyment dodatkowy) Adaptive Sampling oparty na błędzie wzmacnia szum: w regresji pogarsza wynik na 11 z 12 zbiorów. Wariant oparty tylko na rozbieżności jest odporny na szum i lepszy od wariantu z błędem na wszystkich 12 zbiorach regresyjnych. Zysk w klasyfikacji bez szumu daje natomiast głównie sygnał błędu.
 
-Dalsze kierunki: większy limit M i szersze strojenie (w tym głębsze drzewa), Adaptive Sampling odporny na szum w regresji (np. ograniczenie wpływu błędu e_i dla obserwacji odstających) oraz kryterium Early Stopping uwzględniające trudne obserwacje.
+Dalsze kierunki: Adaptive Sampling odporny na szum (wagi łączące błąd i rozbieżność tak, by nie wzmacniać obserwacji z dużym błędem przy małej rozbieżności, albo α/β dobierane do oszacowanego poziomu szumu), większy limit M i szersze strojenie (w tym głębsze drzewa) oraz kryterium Early Stopping uwzględniające trudne obserwacje.
 
 ## 8. Zmiany względem planu
 
@@ -251,6 +352,7 @@ Dalsze kierunki: większy limit M i szersze strojenie (w tym głębsze drzewa), 
 4. **Przestrzenie dla Bagging i RF**: plan ich nie precyzował; przyjęliśmy po 8 kombinacji (tabela 2), ten sam budżet co dla pozostałych metod.
 5. **Dane**: Yacht pobierany bezpośrednio z UCI (niedostępny w ucimlrepo); Wine Quality filtrowane do win białych (ucimlrepo łączy oba pliki).
 6. **Limit M**: pozostał zgodny z planem (M ∈ {100, 200}). Ogranicza to możliwą oszczędność Early Stopping, bo na części zbiorów zespół poprawia się aż do limitu (punkt 6).
+7. **Eksperyment dodatkowy** (poza planem): szum w etykietach (10% i 20%) i ablacja sygnałów Adaptive Sampling (punkt 5.4), na 23 zbiorach – bez Dry Bean ze względu na czas obliczeń. Wyniki eksperymentów głównych (punkty 5.1–5.3) nie zmieniły się.
 
 ## 9. Wykorzystanie narzędzi AI
 
@@ -261,6 +363,29 @@ Zgodnie z zasadami przedmiotu i deklaracją z planu wskazujemy zakres wykorzysta
 
 Koncepcja metody, hipotezy i interpretacja wyników są autorstwa autorów, którzy ponoszą pełną odpowiedzialność za treść raportu.
 
+## 10. Uruchomienie kodu i odtworzenie wyników
+
+Kod znajduje się w repozytorium projektu (struktura w pliku `README.md`). Wymagany jest Python 3.12 i pakiety z pliku `requirements.txt` (m.in. scikit-learn 1.9.1, numpy, pandas, scipy, matplotlib, ucimlrepo). Zbiory danych pobierają się automatycznie z UCI przy pierwszym uruchomieniu i są zapisywane w katalogu `data/`. Wszystkie generatory liczb losowych mają stałe ziarna (podziały CV: 42 i 2026; modele i strojenie: ziarna wyliczane z numeru powtórzenia i foldu), więc ponowne uruchomienie daje identyczne wyniki.
+
+```
+python -m venv .venv
+.venv/Scripts/python.exe -m pip install -r requirements.txt
+.venv/Scripts/python.exe -m pytest -q                  # 14 testów poprawności
+.venv/Scripts/python.exe scripts/run_pilot.py --fresh  # pilotaż (punkt 4.5)
+.venv/Scripts/python.exe scripts/run_full.py           # pełne eksperymenty -> results/full.csv
+.venv/Scripts/python.exe scripts/analyze.py            # tabele i testy -> results/summary.md
+.venv/Scripts/python.exe scripts/figures.py            # rysunki -> results/figures/
+# eksperyment dodatkowy (punkt 5.4) -> results/extra.csv
+.venv/Scripts/python.exe scripts/run_full.py --out results/extra.csv --exclude dry_bean --noise 0.1 0.2 \
+    --methods GBDT Bagging RF Baseline Baseline+1 Baseline+2 Baseline+1+2 "Baseline+1(e)" "Baseline+1(d)"
+.venv/Scripts/python.exe scripts/run_full.py --out results/extra.csv --exclude dry_bean --noise 0.0 \
+    --methods "Baseline+1(e)" "Baseline+1(d)"
+.venv/Scripts/python.exe scripts/analyze_extra.py      # -> results/extra_summary.md, fig_noise.png
+.venv/Scripts/python.exe scripts/md2pdf.py docs/raport_koncowy.md
+```
+
+Pełne eksperymenty trwały 3,6 h, a eksperyment dodatkowy 2,7 h na 8 rdzeniach (parametr `--n-jobs`); przebieg można przerwać i wznowić – skrypt pomija zadania już zapisane w pliku wyników. Na Windows przy przekierowaniu wyjścia do pliku należy ustawić `PYTHONIOENCODING=utf-8`.
+
 ## Literatura
 
 [1] Webb, G. I. (2000). MultiBoosting: A Technique for Combining Boosting and Wagging. *Machine Learning*, 40, 159–196. https://doi.org/10.1023/A:1007659514849
@@ -270,3 +395,5 @@ Koncepcja metody, hipotezy i interpretacja wyników są autorstwa autorów, któ
 [3] Lunde, B. A. S., Kleppe, T. S. (2020). agtboost: Adaptive and Automatic Gradient Tree Boosting Computations. arXiv:2008.12625.
 
 [4] Toghani, M. T., Allen, G. I. (2021). MP-Boost: Minipatch Boosting via Adaptive Feature and Observation Sampling. *IEEE BigComp*. arXiv:2011.07218.
+
+[5] Dietterich, T. G. (2000). An Experimental Comparison of Three Methods for Constructing Ensembles of Decision Trees: Bagging, Boosting, and Randomization. *Machine Learning*, 40, 139–157.

@@ -24,7 +24,7 @@ import numpy as np
 
 from .config import CV_SEEDS, N_FOLDS
 from .data import impute_median, load_dataset
-from .evaluation import (BAGGED_VARIANTS, MAIN_METRIC, ROW_COLUMNS, _fit, _tree_stats,
+from .evaluation import (MAIN_METRIC, ROW_COLUMNS, VARIANT_FLAGS, _fit, _tree_stats,
                          compute_metrics, iter_splits, make_model)
 
 N_CONFIGS = 8
@@ -66,16 +66,20 @@ def sample_configs(method: str, seed: int, fold: int, n: int = N_CONFIGS) -> lis
     def rng(tag: int):
         return np.random.default_rng([seed, fold, tag])
 
-    if method in BAGGED_VARIANTS:
+    if method in VARIANT_FLAGS:
         base = _sample(BASE_SPACE, n, rng(0))
         ab = _sample(AS_PAIRS, n, rng(1))
         kp = _sample(ES_SPACE, n, rng(2))
-        flags = BAGGED_VARIANTS[method]
+        flags = VARIANT_FLAGS[method]
         out = []
         for b, (a, be), e in zip(base, ab, kp):
             cfg = dict(b)
             # parametry wyłączonej modyfikacji nie mają wpływu na model
-            if flags["adaptive_sampling"]:
+            if method == "Baseline+1(e)":         # ablacja: tylko błąd
+                cfg.update(alpha=a, beta=0.0)
+            elif method == "Baseline+1(d)":       # ablacja: tylko rozbieżność
+                cfg.update(alpha=0.0, beta=be)
+            elif flags["adaptive_sampling"]:
                 cfg.update(alpha=a, beta=be)
             else:
                 cfg.update(alpha=1.0, beta=1.0)
@@ -106,13 +110,37 @@ def _score(task: str, y_true, y_pred) -> float:
     return m if task == "clf" else -m
 
 
+def add_label_noise(task: str, y_tr, y_val, rate: float, seed: int, fold: int):
+    """Szum w etykietach części treningowej i walidacyjnej (fold testowy zostaje czysty).
+
+    Każda obserwacja z prawdopodobieństwem `rate` dostaje losową etykietę:
+    clf – inną klasę (jednostajnie spośród pozostałych), reg – wartość celu losowo
+    wybranej obserwacji z części treningowej (zachowuje rozkład brzegowy y).
+    Deterministyczne dla (seed, fold, rate) – wszystkie metody widzą ten sam szum.
+    """
+    if rate <= 0:
+        return y_tr, y_val
+    rng = np.random.default_rng([seed, fold, int(round(rate * 1000)), 7])
+    y = np.concatenate([y_tr, y_val]).copy()
+    hit = np.flatnonzero(rng.random(len(y)) < rate)
+    if task == "clf":
+        classes = np.unique(y)
+        for i in hit:
+            others = classes[classes != y[i]]
+            y[i] = others[rng.integers(len(others))]
+    else:
+        y[hit] = rng.choice(y_tr, size=len(hit))
+    return y[:len(y_tr)], y[len(y_tr):]
+
+
 def run_task(dataset: str, method: str, seed: int, fold: int,
-             n_configs: int = N_CONFIGS) -> dict:
+             noise: float = 0.0, n_configs: int = N_CONFIGS) -> dict:
     """Strojenie + ocena jednej metody na jednym foldzie. Zwraca wiersz wyników."""
     X, y, task, splits = _dataset(dataset)
     tr, va, te = splits[(seed, fold)]
     X_tr, X_val, X_te = impute_median(X[tr], X[va], X[te])
     y_tr, y_val, y_te = y[tr], y[va], y[te]
+    y_tr, y_val = add_label_noise(task, y_tr, y_val, noise, seed, fold)
 
     best = None
     tune_time = 0.0
@@ -142,7 +170,7 @@ def run_task(dataset: str, method: str, seed: int, fold: int,
            "n_stages_mean": n_stages,
            "val_score": val if task == "clf" else -val,
            "tune_time": tune_time, "n_trees_tuning": trees_tuning,
-           "best_config": idx, "params": json.dumps(cfg)}
+           "best_config": idx, "params": json.dumps(cfg), "noise": noise}
     return row
 
 
@@ -150,6 +178,6 @@ FULL_COLUMNS = ROW_COLUMNS + ["val_score", "tune_time", "n_trees_tuning",
                               "best_config", "params"]
 
 
-def all_tasks(datasets, methods, seeds=CV_SEEDS, n_folds: int = N_FOLDS):
-    return [(d, m, s, f) for d in datasets for m in methods
+def all_tasks(datasets, methods, seeds=CV_SEEDS, n_folds: int = N_FOLDS, noises=(0.0,)):
+    return [(d, m, s, f, nz) for nz in noises for d in datasets for m in methods
             for s in seeds for f in range(n_folds)]

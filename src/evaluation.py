@@ -39,6 +39,12 @@ BAGGED_VARIANTS = {
     "Baseline+2": dict(adaptive_sampling=False, ensemble_es=True),
     "Baseline+1+2": dict(adaptive_sampling=True, ensemble_es=True),
 }
+# Ablacja Adaptive Sampling (eksperyment dodatkowy): tylko błąd e_i albo tylko rozbieżność d_i
+ABLATION_VARIANTS = {
+    "Baseline+1(e)": dict(adaptive_sampling=True, ensemble_es=False),   # beta = 0
+    "Baseline+1(d)": dict(adaptive_sampling=True, ensemble_es=False),   # alpha = 0
+}
+VARIANT_FLAGS = {**BAGGED_VARIANTS, **ABLATION_VARIANTS}
 REFERENCE_METHODS = ("GBDT", "Bagging", "RF")
 ALL_METHODS = REFERENCE_METHODS + tuple(BAGGED_VARIANTS)
 
@@ -46,9 +52,9 @@ ALL_METHODS = REFERENCE_METHODS + tuple(BAGGED_VARIANTS)
 def make_model(method: str, task: str, params: dict, seed: int):
     """Tworzy nowy (niewytrenowany) model danej metody."""
     clf = task == "clf"
-    if method in BAGGED_VARIANTS:
+    if method in VARIANT_FLAGS:
         keys = ("B", "M", "max_depth", "learning_rate", "alpha", "beta", "k", "p")
-        return BaggedGBDT(task=task, random_state=seed, **BAGGED_VARIANTS[method],
+        return BaggedGBDT(task=task, random_state=seed, **VARIANT_FLAGS[method],
                           **{k: params[k] for k in keys})
     if method == "GBDT":
         cls = GradientBoostingClassifier if clf else GradientBoostingRegressor
